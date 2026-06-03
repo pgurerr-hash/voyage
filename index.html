@@ -374,7 +374,18 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
       </div>
       <!-- YÖNETİM -->
       <div id="page-admin" class="page">
-        <div class="page-title">⚙️ Yönetim Paneli</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.875rem">
+          <div class="page-title" style="margin-bottom:0">⚙️ Yönetim Paneli</div>
+          <div style="display:flex;gap:7px">
+            <button class="tbtn tbtn-proj" onclick="openProjModal()" style="font-size:12px">🏢 Yeni Proje Ekle</button>
+          </div>
+        </div>
+        <div class="add-box" id="admin-proj-box">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.875rem">
+            <div class="add-box-title" style="margin-bottom:0">🏢 Projeler</div>
+          </div>
+          <div id="admin-proj-list"></div>
+        </div>
         <div class="add-box">
           <div class="add-box-title">👤 Danışmanlar</div>
           <div id="dan-list"></div>
@@ -431,6 +442,16 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
           <option value="ilgilendi">İlgilendi</option>
           <option value="dusunuyor">Düşünüyor</option>
           <option value="ilgilenmedi">İlgilenmedi</option>
+        </select></div>
+      <div class="mfield"><label>Nereden Ulaşıldı</label>
+        <select id="nc-source">
+          <option value="">— Seçiniz —</option>
+          <option value="reklam">Reklam</option>
+          <option value="mevcut">Mevcut Müşteri</option>
+          <option value="ofis">Ofis Müşterisi</option>
+          <option value="referans">Referans</option>
+          <option value="sosyal">Sosyal Medya</option>
+          <option value="diger">Diğer</option>
         </select></div>
       <div class="mfield admin-only"><label>Danışman Ata</label>
         <select id="nc-consultant"><option value="">— Seçiniz —</option></select></div>
@@ -773,6 +794,7 @@ function buildCustCard(c, num) {
         ${im ? `<span class="ibadge ${im[0]}">${im[1]}</span>` : ''}
         ${proj ? `<span style="font-size:10px;color:var(--navy);background:#e8f0f8;padding:1px 6px;border-radius:6px;font-weight:600;white-space:nowrap">${proj.name}</span>` : ''}
         ${port ? `<span style="font-size:10px;color:var(--purple);background:#f0ecf8;padding:1px 6px;border-radius:6px;font-weight:600;white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis;display:inline-block">${port.title}</span>` : ''}
+        ${c.source ? `<span style="font-size:10px;background:#f0f0f0;color:#555;padding:1px 6px;border-radius:6px;font-weight:600;white-space:nowrap">${{reklam:'📢 Reklam',mevcut:'👤 Mevcut',ofis:'🏢 Ofis',referans:'🤝 Referans',sosyal:'📱 Sosyal',diger:'❓ Diğer'}[c.source]||c.source}</span>` : ''}
         ${tBadge(c.call1_date, c.call1_done)}${tBadge(c.call2_date, c.call2_done)}
       </div>
       <div class="cust-right">
@@ -785,6 +807,16 @@ function buildCustCard(c, num) {
     <div class="cust-detail" id="det-${c.id}">
       ${editable ? `
       <div class="dgrid">
+        <div class="dfield"><label>Nereden Ulaşıldı</label>
+          <select id="dsrc-${c.id}">
+            <option value="">—</option>
+            <option value="reklam" ${c.source==='reklam'?'selected':''}>📢 Reklam</option>
+            <option value="mevcut" ${c.source==='mevcut'?'selected':''}>👤 Mevcut Müşteri</option>
+            <option value="ofis" ${c.source==='ofis'?'selected':''}>🏢 Ofis</option>
+            <option value="referans" ${c.source==='referans'?'selected':''}>🤝 Referans</option>
+            <option value="sosyal" ${c.source==='sosyal'?'selected':''}>📱 Sosyal Medya</option>
+            <option value="diger" ${c.source==='diger'?'selected':''}>❓ Diğer</option>
+          </select></div>
         <div class="dfield"><label>Durum</label>
           <select id="ds-${c.id}" ${!editable?'disabled':''}>
             <option value="bekleyen" ${c.status==='bekleyen'?'selected':''}>Bekleyen</option>
@@ -841,6 +873,7 @@ async function saveCustomerDetail(id) {
     status: ge('ds-' + id)?.value || 'bekleyen',
     interest_status: ge('di-' + id)?.value || '',
     notes: ge('dn-' + id)?.value || '',
+    source: ge('dsrc-' + id)?.value || '',
     call1_date: ge('dt1d-' + id)?.value || '',
     call1_time: ge('dt1t-' + id)?.value || '',
     call1_note: ge('dt1n-' + id)?.value || '',
@@ -891,7 +924,7 @@ function renderCustomers() {
         <span class="proj-sec-count">${rows.length} müşteri</span>
       </div>
       <table class="vtable"><thead><tr>
-        <th>#</th><th>İsim</th><th>Telefon</th><th>Portföy</th><th>Durum</th><th>İlgi</th><th>Danışman</th><th>1.Takip</th><th>Not</th>
+        <th>#</th><th>İsim</th><th>Telefon</th><th>Portföy</th><th>Kaynak</th><th>Durum</th><th>İlgi</th><th>Danışman</th><th>1.Takip</th><th>Not</th>
       </tr></thead><tbody>
       ${rows.map((c, i) => {
         const port = PORTFOLIOS.find(p => p.id === c.portfolio_id);
@@ -901,6 +934,7 @@ function renderCustomers() {
         return `<tr onclick="goToCustomer('${c.id}')">
           <td>${i+1}</td><td class="link">${c.name}</td><td>${c.phone||'—'}</td>
           <td style="font-size:11px;color:var(--purple)">${port?port.title:'—'}</td>
+          <td style="font-size:11px;color:#555">${{reklam:'📢 Reklam',mevcut:'👤 Mevcut',ofis:'🏢 Ofis',referans:'🤝 Referans',sosyal:'📱 Sosyal'}[c.source]||c.source||'—'}</td>
           <td><span class="sbadge ${sm[0]}">${sm[1]}</span></td>
           <td style="font-size:11px">${imap[c.interest_status]||'—'}</td>
           <td style="font-size:11px">${consul?consul.name.split(' ')[0]+' '+consul.name.split(' ').slice(-1)[0]:'—'}</td>
@@ -940,6 +974,7 @@ function openCustModal(editId = null) {
     ge('nc-proj-srch').value = proj ? proj.name : ''; ge('nc-proj-id').value = c.project_id || '';
     const port = PORTFOLIOS.find(p => p.id === c.portfolio_id);
     ge('nc-port-srch').value = port ? port.title : ''; ge('nc-port-id').value = c.portfolio_id || '';
+    ge('nc-source').value = c.source || '';
   } else {
     ge('cust-modal-title').textContent = '➕ Yeni Müşteri Ekle';
     ge('cust-submit-btn').textContent = 'Ekle';
@@ -948,6 +983,7 @@ function openCustModal(editId = null) {
     ge('nc-consultant').value = '';
     ge('nc-proj-srch').value = ''; ge('nc-proj-id').value = '';
     ge('nc-port-srch').value = ''; ge('nc-port-id').value = '';
+    ge('nc-source').value = '';
   }
   buildProjSS('nc-proj-dd', 'nc-proj-id', '');
   openMo('mo-cust');
@@ -962,9 +998,10 @@ async function submitCustomer() {
 
   const payload = {
     name, phone: ge('nc-phone').value.trim() || '',
-    project_id: projId, portfolio_id: portId,
+    project_id: projId || null, portfolio_id: portId || null,
     status: ge('nc-status').value || 'bekleyen',
     interest_status: ge('nc-interest').value || '',
+    source: ge('nc-source').value || '',
     assigned_consultant_id: consultId,
     notes: ge('nc-notes').value.trim(),
     updated_at: new Date().toISOString(),
@@ -1056,7 +1093,7 @@ function renderProjects() {
       `<div class="price-row"><span class="pl">${pr.l}</span><span class="pv">${pr.v}</span>${CUR.role === 'admin' ? `<button class="price-del" onclick="delProjPrice('${p.id}',${pi})">✕</button>` : ''}</div>`
     ).join('');
     return `<div class="pcard"><div class="pcard-hdr ${p.color || 'other'}">
-      <div><div class="pcard-name">${p.name}</div>${p.developer ? `<div class="pcard-dev">${p.developer}${p.delivery_date ? ' · ' + p.delivery_date : ''}</div>` : ''}</div>
+      <div onclick="showProjDetail('${p.id}')" style="cursor:pointer;flex:1"><div class="pcard-name" style="text-decoration:underline;text-decoration-color:rgba(255,255,255,.4)">${p.name}</div>${p.developer ? `<div class="pcard-dev">${p.developer}${p.delivery_date ? ' · ' + p.delivery_date : ''}</div>` : ''}</div>
       <div class="pcard-act">
         <button class="p-act-btn" onclick="openProjModal('${p.id}')">✏️</button>
         <button class="p-act-btn del" onclick="askDelete('project','${p.id}','${p.name}')">🗑</button>
@@ -1236,15 +1273,34 @@ function renderAdmin() {
     dansArr.map(d => `<button class="dtab ${adminFilter===d.id?'on':''}" onclick="setAdminF('${d.id}')">${d.name}</button>`).join('');
   const imap = {ilgilendi:'İlgilendi',dusunuyor:'Düşünüyor',ilgilenmedi:'İlgilenmedi'};
   const smap = {bekleyen:['s-bek','Bekleyen'],arandi:['s-a','Arandı'],gorusuldu:['s-g','Görüşüldü'],ulasilamadi:['s-u','Ulaşılamadı'],takip:['s-t','Takip'],ilgisiz:['s-i','İlgisiz']};
+  // Render projects in admin
+  const apEl = ge('admin-proj-list');
+  if (apEl) {
+    apEl.innerHTML = PROJECTS.length ? PROJECTS.map(p => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:10px;flex:1;cursor:pointer" onclick="showProjDetail('${p.id}')">
+          <div style="width:10px;height:10px;border-radius:50%;background:${p.color==='inci'?'#1a3c5e':p.color==='atilgan'?'#2e6b3e':p.color==='gold'?'#c9a227':'#7a5c99'};flex-shrink:0"></div>
+          <span style="font-size:13px;font-weight:600;color:var(--navy)">${p.name}</span>
+          ${p.developer ? `<span style="font-size:11px;color:var(--muted)">${p.developer}</span>` : ''}
+          ${p.delivery_date ? `<span style="font-size:11px;color:var(--muted)">· ${p.delivery_date}</span>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:var(--muted)">${CUSTOMERS.filter(c=>c.project_id===p.id).length} müşteri</span>
+          <button class="icon-btn edit" onclick="openProjModal('${p.id}')">✏️</button>
+          <button class="icon-btn" onclick="askDelete('project','${p.id}','${p.name}')">🗑</button>
+        </div>
+      </div>`).join('') : '<div style="font-size:13px;color:var(--muted);padding:6px">Henüz proje yok.</div>';
+  }
+
   const tableEl = ge('admin-table');
   if (tableEl) tableEl.innerHTML = filtered.length ? `<div style="background:var(--card);border:1px solid var(--border);border-radius:11px;overflow:hidden">
-    <table class="vtable"><thead><tr><th>#</th><th>İsim</th><th>Tel</th><th>Proje</th><th>Portföy</th><th>Danışman</th><th>Durum</th><th>İlgi</th><th>Not</th></tr></thead><tbody>
+    <table class="vtable"><thead><tr><th>#</th><th>İsim</th><th>Tel</th><th>Proje</th><th>Portföy</th><th>Kaynak</th><th>Danışman</th><th>Durum</th><th>İlgi</th><th>Not</th></tr></thead><tbody>
     ${filtered.map((c,i) => {
       const proj=PROJECTS.find(p=>p.id===c.project_id);
       const port=PORTFOLIOS.find(p=>p.id===c.portfolio_id);
       const consul=PROFILES.find(p=>p.id===c.assigned_consultant_id);
       const sm=smap[c.status]||['s-bek','Bekleyen'];
-      return `<tr><td>${i+1}</td><td class="link" onclick="goToCustomer('${c.id}')">${c.name}</td><td>${c.phone||'—'}</td><td style="font-size:11px">${proj?proj.name:'—'}</td><td style="font-size:11px;color:var(--purple)">${port?port.title:'—'}</td><td style="font-size:11px">${consul?consul.name:'—'}</td><td><span class="sbadge ${sm[0]}">${sm[1]}</span></td><td>${imap[c.interest_status]||'—'}</td><td style="font-size:11px;color:var(--muted)">${c.notes?c.notes.slice(0,28)+(c.notes.length>28?'…':''):'—'}</td></tr>`;
+      const srcMap2={reklam:'📢 Reklam',mevcut:'👤 Mevcut',ofis:'🏢 Ofis',referans:'🤝 Referans',sosyal:'📱 Sosyal'};return `<tr><td>${i+1}</td><td class="link" onclick="goToCustomer('${c.id}')">${c.name}</td><td>${c.phone||'—'}</td><td style="font-size:11px">${proj?proj.name:'—'}</td><td style="font-size:11px;color:var(--purple)">${port?port.title:'—'}</td><td style="font-size:11px">${srcMap2[c.source]||c.source||'—'}</td><td style="font-size:11px">${consul?consul.name:'—'}</td><td><span class="sbadge ${sm[0]}">${sm[1]}</span></td><td>${imap[c.interest_status]||'—'}</td><td style="font-size:11px;color:var(--muted)">${c.notes?c.notes.slice(0,28)+(c.notes.length>28?'…':''):'—'}</td></tr>`;
     }).join('')}
     </tbody></table></div>` : '<div class="empty">Kayıt yok.</div>';
 }
@@ -1433,6 +1489,63 @@ function generatePdf() {
   doc.save('voyage-rapor-'+new Date().toISOString().slice(0,10)+'.pdf');
 }
 
+
+// ═══ PROJECT DETAIL MODAL ══════════════════════════════════
+let detailProjId = null;
+function showProjDetail(projId) {
+  const p = PROJECTS.find(x => x.id === projId); if (!p) return;
+  detailProjId = projId;
+  ge('pd-title').textContent = p.name;
+  const custInProj = CUSTOMERS.filter(c => c.project_id === p.id && canSeeCustomer(c));
+  const contacted = custInProj.filter(c => c.status !== 'bekleyen');
+  const smap = {bekleyen:['s-bek','Bekleyen'],arandi:['s-a','Arandı'],gorusuldu:['s-g','Görüşüldü'],ulasilamadi:['s-u','Ulaşılamadı'],takip:['s-t','Takip'],ilgisiz:['s-i','İlgisiz']};
+  const srcMap = {reklam:'📢 Reklam',mevcut:'👤 Mevcut',ofis:'🏢 Ofis',referans:'🤝 Referans',sosyal:'📱 Sosyal'};
+  ge('pd-body').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem">
+      ${p.location ? `<div><div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px">Konum</div><div style="font-size:13px;font-weight:600">${p.location}</div></div>` : ''}
+      ${p.delivery_date ? `<div><div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px">Teslim Tarihi</div><div style="font-size:13px;font-weight:600">${p.delivery_date}</div></div>` : ''}
+      ${p.developer ? `<div><div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px">Geliştirici</div><div style="font-size:13px;font-weight:600">${p.developer}</div></div>` : ''}
+      ${p.room_types ? `<div><div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px">Oda Tipleri</div><div style="font-size:13px;font-weight:600">${p.room_types}</div></div>` : ''}
+    </div>
+    ${p.description ? `<p style="font-size:13px;color:var(--muted);margin-bottom:1rem;line-height:1.6">${p.description}</p>` : ''}
+    ${p.prices && p.prices.length ? `
+    <div style="margin-bottom:1rem">
+      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Fiyat Listesi</div>
+      ${p.prices.map(pr => `<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px"><span style="color:var(--muted)">${pr.l}</span><strong style="color:var(--navy)">${pr.v}</strong></div>`).join('')}
+    </div>` : ''}
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:1rem">
+      <div style="background:var(--bg);border-radius:9px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--navy)">${custInProj.length}</div><div style="font-size:10px;color:var(--muted)">Toplam Müşteri</div></div>
+      <div style="background:#d4edda;border-radius:9px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--green)">${contacted.filter(c=>c.status==='gorusuldu').length}</div><div style="font-size:10px;color:var(--green)">Görüşüldü</div></div>
+      <div style="background:#fff3cd;border-radius:9px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:#856404">${contacted.filter(c=>c.status==='takip').length}</div><div style="font-size:10px;color:#856404">Takip</div></div>
+    </div>
+    ${p.notes ? `<div style="background:var(--bg);border-radius:9px;padding:10px;margin-bottom:1rem;font-size:12px;color:var(--muted)">${p.notes}</div>` : ''}
+    ${contacted.length ? `
+    <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Son İletişimler</div>
+    <table class="vtable">
+      <thead><tr><th>İsim</th><th>Tel</th><th>Kaynak</th><th>Durum</th><th>Danışman</th><th>Not</th></tr></thead>
+      <tbody>
+      ${contacted.slice(0,10).map(c => {
+        const consul = PROFILES.find(pr => pr.id === c.assigned_consultant_id);
+        const sm = smap[c.status]||['s-bek','Bekleyen'];
+        return `<tr onclick="closeMo('mo-proj-detail');goToCustomer('${c.id}')">
+          <td class="link">${c.name}</td><td>${c.phone||'—'}</td>
+          <td style="font-size:11px">${srcMap[c.source]||c.source||'—'}</td>
+          <td><span class="sbadge ${sm[0]}">${sm[1]}</span></td>
+          <td style="font-size:11px">${consul?consul.name.split(' ')[0]:'—'}</td>
+          <td style="font-size:11px;color:var(--muted)">${c.notes?c.notes.slice(0,25)+(c.notes.length>25?'…':''):'—'}</td>
+        </tr>`;
+      }).join('')}
+      ${contacted.length > 10 ? `<tr><td colspan="6" style="color:var(--muted);font-size:11px">+ ${contacted.length-10} kişi daha</td></tr>` : ''}
+      </tbody>
+    </table>` : '<div style="font-size:13px;color:var(--muted);padding:8px 0">Bu projeyle henüz iletişim kurulmadı.</div>'}
+  `;
+  openMo('mo-proj-detail');
+}
+function editFromDetail() {
+  closeMo('mo-proj-detail');
+  if (detailProjId) openProjModal(detailProjId);
+}
+
 // ═══ PAGE SWITCH ═══════════════════════════════════════════
 function switchPage(page, tab) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
@@ -1458,14 +1571,29 @@ function flash(msg, isErr) {
   setTimeout(() => f.style.display = 'none', 2500);
 }
 
-['mo-cust','mo-proj','mo-port','mo-xml','mo-pdf','mo-del'].forEach(id => {
+['mo-cust','mo-proj','mo-port','mo-xml','mo-pdf','mo-del','mo-proj-detail'].forEach(id => {
   const el = ge(id);
   if (el) el.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('open'); });
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') ['mo-cust','mo-proj','mo-port','mo-xml','mo-pdf','mo-del'].forEach(id => { const el=ge(id); if(el) el.classList.remove('open'); });
+  if (e.key === 'Escape') ['mo-cust','mo-proj','mo-port','mo-xml','mo-pdf','mo-del','mo-proj-detail'].forEach(id => { const el=ge(id); if(el) el.classList.remove('open'); });
 });
 
 </script>
+
+<!-- PROJECT DETAIL MODAL -->
+<div class="mo" id="mo-proj-detail">
+  <div class="mbox" style="width:640px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.1rem">
+      <div class="mtitle" id="pd-title" style="margin-bottom:0">Proje Detayı</div>
+      <div style="display:flex;gap:7px">
+        <button class="msubmit" style="font-size:11px;padding:5px 12px" id="pd-edit-btn" onclick="editFromDetail()">✏️ Düzenle</button>
+        <button class="mcancel" onclick="closeMo('mo-proj-detail')">✕</button>
+      </div>
+    </div>
+    <div id="pd-body"></div>
+  </div>
+</div>
+
 </body>
 </html>
