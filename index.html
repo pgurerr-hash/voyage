@@ -414,7 +414,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
     <div class="mgrid">
       <div class="mfield full"><label>İsim Soyisim *</label><input type="text" id="nc-name" placeholder="Ad Soyad..."></div>
       <div class="mfield"><label>Telefon</label><input type="text" id="nc-phone" placeholder="05xx xxx xx xx"></div>
-      <div class="mfield"><label>Proje *</label>
+      <div class="mfield"><label>Proje</label>
         <div class="ss-wrap">
           <input class="ss-inp" id="nc-proj-srch" type="text" placeholder="Proje seç..." autocomplete="off"
             oninput="buildProjSS('nc-proj-dd','nc-proj-id',this.value)" onfocus="buildProjSS('nc-proj-dd','nc-proj-id',this.value)" onblur="setTimeout(()=>closeSS('nc-proj-dd'),150)">
@@ -488,9 +488,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
     <input type="hidden" id="edit-port-id">
     <div class="mgrid">
       <div class="mfield full"><label>Portföy Adı *</label><input type="text" id="nport-name" placeholder="İnci Mega 3+1 Köşe..."></div>
-      <div class="mfield"><label>Proje *</label>
+      <div class="mfield"><label>Proje</label>
         <div class="ss-wrap">
-          <input class="ss-inp" id="nport-proj-srch" type="text" placeholder="Proje seç..." autocomplete="off"
+          <input class="ss-inp" id="nport-proj-srch" type="text" placeholder="Proje seç (opsiyonel)..." autocomplete="off"
             oninput="buildProjSS('nport-proj-dd','nport-proj-id',this.value)" onfocus="buildProjSS('nport-proj-dd','nport-proj-id',this.value)" onblur="setTimeout(()=>closeSS('nport-proj-dd'),150)">
           <input type="hidden" id="nport-proj-id">
           <div class="ss-dd" id="nport-proj-dd"></div>
@@ -762,10 +762,9 @@ function filterCustomers(list) {
 }
 
 // ═══ CALL LIST — 5'li gruplar ══════════════════════
-const DEFAULT_GROUP_CONSULTANTS = {
-  0:'Şehmus Emre Kavak',1:'Olcay Kart',2:'Olcay Kart',
-  3:'Olcay Kart',4:'Şehmus Emre Kavak',5:'Şehmus Emre Kavak'
-};
+// 6'lı döngü: Şehmus, Olcay, Olcay, Olcay, Şehmus, Şehmus
+const GRP_PATTERN = ['Şehmus Emre Kavak','Olcay Kart','Olcay Kart','Olcay Kart','Şehmus Emre Kavak','Şehmus Emre Kavak'];
+const DEFAULT_GROUP_CONSULTANTS = new Proxy({},{get(_,g){return GRP_PATTERN[Number(g)%GRP_PATTERN.length]||'';}});
 let GROUP_OVERRIDES = {};
 async function loadGroupOverrides() {
   try {
@@ -1840,21 +1839,30 @@ function editFromDetail() {
 // ═══ FILE IMPORT ════════════════════════════════════════
 let importData = [];
 
+function loadXLSX(cb) {
+  if (typeof XLSX !== 'undefined') { cb(); return; }
+  const prev = ge('imp-preview');
+  if (prev) prev.innerHTML = '<div style="padding:8px;font-size:12px;color:var(--muted)">⏳ Yükleniyor...</div>';
+  const s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+  s.onload = cb;
+  s.onerror = () => showImportPreview([], '⚠ Kütüphane yüklenemedi. CSV deneyin.');
+  document.head.appendChild(s);
+}
 function importFileSelect(file) {
   if (!file) return;
   const ext = file.name.split('.').pop().toLowerCase();
-  if (ext === 'csv') {
+  if (ext === 'csv' || ext === 'tsv' || ext === 'txt') {
     const reader = new FileReader();
-    reader.onload = e => parseImportCSV(e.target.result);
+    reader.onload = e => parseImportCSV(ext === 'tsv' ? e.target.result.replace(/	/g,',') : e.target.result);
     reader.readAsText(file, 'UTF-8');
-  } else if (ext === 'xlsx' || ext === 'xls') {
-    const reader = new FileReader();
-    reader.onload = e => parseImportExcel(e.target.result);
-    reader.readAsArrayBuffer(file);
-  } else if (ext === 'numbers') {
-    showImportPreview([], '⚠ Numbers dosyaları için önce Excel veya CSV olarak kaydedin.');
   } else {
-    showImportPreview([], '⚠ Desteklenmeyen dosya türü. CSV veya Excel kullanın.');
+    // Excel (.xlsx, .xls) veya Numbers — SheetJS ile oku
+    loadXLSX(() => {
+      const reader = new FileReader();
+      reader.onload = e => parseImportExcel(e.target.result);
+      reader.readAsArrayBuffer(file);
+    });
   }
 }
 
@@ -1892,30 +1900,22 @@ function parseImportCSV(text) {
 }
 
 function parseImportExcel(buffer) {
-  // Use SheetJS if available, otherwise show error
   try {
-    if (typeof XLSX === 'undefined') {
-      showImportPreview([], '⚠ Excel desteği için SheetJS yükleniyor...');
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
-      s.onload = () => {
-        const wb = XLSX.read(buffer, {type:'arraybuffer'});
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_csv(ws);
-        parseImportCSV(data);
-      };
-      document.head.appendChild(s);
-    } else {
-      const wb = XLSX.read(buffer, {type:'arraybuffer'});
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const data = XLSX.utils.sheet_to_csv(ws);
-      parseImportCSV(data);
-    }
+    const wb = XLSX.read(buffer, {type:'arraybuffer', cellDates:true});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const arr = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+    if (!arr.length) { showImportPreview([], '⚠ Dosya boş.'); return; }
+    const csvLines = arr.map(row =>
+      row.map(cell => {
+        const s = String(cell===null||cell===undefined?'':cell).trim();
+        return s.includes(',') || s.includes(';') ? '"'+s+'"' : s;
+      }).join(',')
+    );
+    parseImportCSV(csvLines.join('\n'));
   } catch(e) {
-    showImportPreview([], '⚠ Excel dosyası okunamadı: ' + e.message);
+    showImportPreview([], '⚠ Dosya okunamadı: ' + e.message);
   }
 }
-
 function showImportPreview(rows, errMsg) {
   importData = rows;
   const prev = ge('imp-preview');
@@ -2105,9 +2105,9 @@ document.addEventListener('keydown', e => {
       ondragover="event.preventDefault();this.style.borderColor='var(--navy)';this.style.background='#f0f5fb'"
       ondragleave="this.style.borderColor='';this.style.background=''"
       ondrop="event.preventDefault();this.style.borderColor='';this.style.background='';importFileSelect(event.dataTransfer.files[0])">
-      📂 CSV, Excel veya Numbers dosyasını sürükleyin veya tıklayın
+      📂 CSV, Excel (.xlsx/.xls), Numbers dosyasını sürükleyin veya tıklayın
     </div>
-    <input type="file" id="imp-file" accept=".csv,.xlsx,.xls,.numbers" style="display:none" onchange="importFileSelect(this.files[0])">
+    <input type="file" id="imp-file" accept=".csv,.xlsx,.xls,.numbers,.tsv,.txt" style="display:none" onchange="importFileSelect(this.files[0])">
     <div id="imp-preview" style="margin-top:10px"></div>
     <div id="imp-proj-row" style="display:none;margin-top:10px">
       <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:4px">Varsayılan Proje (opsiyonel)</label>
