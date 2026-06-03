@@ -1081,6 +1081,370 @@ function renderProjects() {
   }).join('');
 }
 
+// ═══ PORTFOLIOS ══════════════════════════════════════════
+function openPortModal(editId = null) {
+  ge('edit-port-id').value = editId || '';
+  if (editId) {
+    const p = PORTFOLIOS.find(x => x.id === editId); if (!p) return;
+    ge('port-modal-title').textContent = '✏️ Portföy Düzenle'; ge('port-submit-btn').textContent = 'Güncelle';
+    ge('nport-name').value = p.title; ge('nport-type').value = p.room_type || '';
+    ge('nport-net').value = p.square_meter_net || ''; ge('nport-brut').value = p.square_meter_gross || '';
+    ge('nport-price').value = p.price || ''; ge('nport-floor').value = p.floor_info || ''; ge('nport-desc').value = p.description || '';
+    const proj = PROJECTS.find(pr => pr.id === p.project_id);
+    ge('nport-proj-srch').value = proj ? proj.name : ''; ge('nport-proj-id').value = p.project_id || '';
+  } else {
+    ge('port-modal-title').textContent = '💼 Yeni Portföy Ekle'; ge('port-submit-btn').textContent = 'Ekle';
+    ['nport-name','nport-type','nport-net','nport-brut','nport-price','nport-floor','nport-desc'].forEach(id => { const el=ge(id); if(el) el.value=''; });
+    ge('nport-proj-srch').value = ''; ge('nport-proj-id').value = '';
+  }
+  buildProjSS('nport-proj-dd', 'nport-proj-id', '');
+  openMo('mo-port');
+}
+async function submitPortfolio() {
+  const name = ge('nport-name').value.trim(); if (!name) return;
+  const editId = ge('edit-port-id').value;
+  const payload = { title: name, project_id: ge('nport-proj-id').value || null,
+    room_type: ge('nport-type').value.trim(), square_meter_net: ge('nport-net').value.trim(),
+    square_meter_gross: ge('nport-brut').value.trim(), price: ge('nport-price').value.trim(),
+    floor_info: ge('nport-floor').value.trim(), description: ge('nport-desc').value.trim(),
+    updated_at: new Date().toISOString() };
+  if (editId) {
+    const { error } = await db.from('portfolios').update(payload).eq('id', editId);
+    if (error) { flash('Hata: ' + error.message, true); return; }
+    const idx = PORTFOLIOS.findIndex(p => p.id === editId);
+    if (idx >= 0) PORTFOLIOS[idx] = { ...PORTFOLIOS[idx], ...payload };
+    flash('Portföy güncellendi');
+  } else {
+    payload.created_by = CUR.id;
+    const { data, error } = await db.from('portfolios').insert(payload).select().single();
+    if (error) { flash('Hata: ' + error.message, true); return; }
+    PORTFOLIOS.push(data);
+    flash('Portföy eklendi');
+  }
+  closeMo('mo-port'); renderAll();
+}
+async function savePortNote(pid) {
+  const note = ge('pn-' + pid) ? ge('pn-' + pid).value : '';
+  await db.from('portfolios').update({ notes: note }).eq('id', pid);
+  const p = PORTFOLIOS.find(x => x.id === pid); if (p) p.notes = note;
+  flash('Not kaydedildi');
+}
+function renderPortfolios() {
+  const grid = ge('port-grid'); if (!grid) return;
+  const mine = CUR.role === 'admin' ? PORTFOLIOS : PORTFOLIOS.filter(p => p.created_by === CUR.id);
+  if (!mine.length) { grid.innerHTML = '<div class="empty">Henüz portföy yok. ＋ Portföy butonuyla ekleyin.</div>'; return; }
+  grid.innerHTML = mine.map(p => {
+    const proj = PROJECTS.find(pr => pr.id === p.project_id);
+    const custs = CUSTOMERS.filter(c => c.portfolio_id === p.id && canSeeCustomer(c));
+    const createdBy = PROFILES.find(pr => pr.id === p.created_by);
+    return `<div class="portcard" id="portcard-${p.id}">
+      <div class="portcard-hdr">
+        <div class="portcard-name" onclick="showPortDetail('${p.id}')">${p.title}</div>
+        <div class="portcard-acts">
+          <button class="port-act" onclick="openPortModal('${p.id}')">✏️</button>
+          <button class="port-act del" onclick="askDelete('portfolio','${p.id}','${p.title.replace(/'/g,"\'")}')">🗑</button>
+        </div>
+      </div>
+      <div class="portcard-proj">${proj ? proj.name : '—'}</div>
+      ${createdBy && CUR.role === 'admin' ? `<div class="portcard-by">👤 ${createdBy.name}</div>` : ''}
+      ${p.room_type || p.square_meter_net ? `<div class="portcard-meta">${[p.room_type, p.square_meter_net ? p.square_meter_net+' net' : '', p.price].filter(Boolean).join(' · ')}</div>` : ''}
+      ${p.description ? `<div class="portcard-meta" style="font-size:11px">${p.description}</div>` : ''}
+      <div class="portcard-stats">
+        <div class="portcard-stat">Müşteri: <span>${custs.length}</span></div>
+        <div class="portcard-stat">Görüşüldü: <span style="color:var(--green)">${custs.filter(c=>c.status==='gorusuldu').length}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function showPortDetail(pid) {
+  const p = PORTFOLIOS.find(x => x.id === pid); if (!p) return;
+  document.querySelectorAll('.portcard').forEach(c => c.classList.remove('sel'));
+  const pc = ge('portcard-'+pid); if(pc) pc.classList.add('sel');
+  const custs = CUSTOMERS.filter(c => c.portfolio_id === pid && canSeeCustomer(c));
+  const imap = {ilgilendi:'İlgilendi',dusunuyor:'Düşünüyor',ilgilenmedi:'İlgilenmedi'};
+  const smap = {bekleyen:['s-bek','Bekleyen'],arandi:['s-a','Arandı'],gorusuldu:['s-g','Görüşüldü'],ulasilamadi:['s-u','Ulaşılamadı'],takip:['s-t','Takip'],ilgisiz:['s-i','İlgisiz']};
+  const det = ge('port-detail'); if(!det) return;
+  det.innerHTML = `<div class="port-detail-box">
+    <div class="port-det-hdr"><strong>${p.title}</strong><span style="font-size:12px;color:var(--muted)">${[p.room_type,p.square_meter_net,p.price].filter(Boolean).join(' · ')}</span></div>
+    <div style="padding:9px 12px;border-bottom:1px solid var(--border)">
+      <label style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:3px">Portföy Notu</label>
+      <textarea class="pnote" id="pn-${p.id}" style="min-height:44px">${p.notes||''}</textarea>
+      <button class="psave" onclick="savePortNote('${p.id}')">Kaydet</button>
+    </div>
+    ${custs.length ? `<table class="vtable"><thead><tr><th>#</th><th>İsim</th><th>Tel</th><th>Durum</th><th>İlgi</th><th>Danışman</th><th>Not</th></tr></thead><tbody>
+    ${custs.map((c,i) => { const consul=PROFILES.find(pr=>pr.id===c.assigned_consultant_id); const sm=smap[c.status]||['s-bek','Bekleyen']; return `<tr><td>${i+1}</td><td class="link" onclick="goToCustomer('${c.id}')">${c.name}</td><td>${c.phone||'—'}</td><td><span class="sbadge ${sm[0]}">${sm[1]}</span></td><td style="font-size:11px">${imap[c.interest_status]||'—'}</td><td style="font-size:11px">${consul?consul.name.split(' ')[0]:'—'}</td><td style="font-size:11px;color:var(--muted)">${c.notes?c.notes.slice(0,28)+(c.notes.length>28?'…':''):'—'}</td></tr>`; }).join('')}
+    </tbody></table>` : '<div class="empty" style="padding:1rem">Bu portföye henüz müşteri atanmadı.</div>'}
+  </div>`;
+  det.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+// ═══ DELETE ════════════════════════════════════════════════
+function askDelete(type, id, name) {
+  pendingDel = { type, id };
+  const dn = ge('del-name'); if(dn) dn.textContent = name;
+  openMo('mo-del');
+}
+async function confirmDelete() {
+  if (!pendingDel) return;
+  const { type, id } = pendingDel;
+  if (type === 'customer') {
+    await db.from('customers').delete().eq('id', id);
+    CUSTOMERS = CUSTOMERS.filter(c => c.id !== id);
+  } else if (type === 'project') {
+    const hasCust = CUSTOMERS.some(c => c.project_id === id);
+    if (hasCust) { flash('Önce bu projeye bağlı müşterileri kaldırın!', true); closeMo('mo-del'); return; }
+    await db.from('projects').update({ is_active: false }).eq('id', id);
+    PROJECTS = PROJECTS.filter(p => p.id !== id);
+  } else if (type === 'portfolio') {
+    await db.from('portfolios').delete().eq('id', id);
+    PORTFOLIOS = PORTFOLIOS.filter(p => p.id !== id);
+  }
+  closeMo('mo-del'); flash('Silindi'); pendingDel = null; renderAll();
+}
+
+// ═══ ADMIN ═════════════════════════════════════════════════
+function renderAdmin() {
+  if (CUR.role !== 'admin') return;
+  const danListEl = ge('dan-list');
+  const dansArr = PROFILES.filter(p => p.role === 'danisan');
+  if (danListEl) {
+    danListEl.innerHTML = dansArr.map(d => {
+      const cnt = CUSTOMERS.filter(c => c.assigned_consultant_id === d.id || c.created_by === d.id).length;
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:13px;font-weight:600">${d.name}</span>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:11px;color:var(--muted)">PIN: ${d.pin}</span>
+          <span style="font-size:11px;color:var(--muted)">${cnt} müşteri</span>
+          <button class="icon-btn" onclick="delDanisan('${d.id}','${d.name.replace(/'/g,"\'")}')">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  const all = CUSTOMERS;
+  const filtered = adminFilter === 'all' ? all : all.filter(c => c.assigned_consultant_id === adminFilter || c.created_by === adminFilter);
+  const done = filtered.filter(c => c.status === 'gorusuldu').length;
+  const bek = filtered.filter(c => ['bekleyen','arandi','ulasilamadi','takip'].includes(c.status)).length;
+  const tak = filtered.filter(c => c.status === 'takip').length;
+  const statsEl = ge('admin-stats');
+  if (statsEl) statsEl.innerHTML = `
+    <div class="astat"><div class="astat-n">${filtered.length}</div><div class="astat-l">Toplam</div></div>
+    <div class="astat"><div class="astat-n" style="color:var(--green)">${done}</div><div class="astat-l">Görüşüldü</div></div>
+    <div class="astat"><div class="astat-n" style="color:var(--orange)">${bek}</div><div class="astat-l">Bekliyor</div></div>
+    <div class="astat"><div class="astat-n" style="color:#e6b000">${tak}</div><div class="astat-l">Takip</div></div>`;
+  const dtabsEl = ge('dtabs');
+  if (dtabsEl) dtabsEl.innerHTML = `<button class="dtab ${adminFilter==='all'?'on':''}" onclick="setAdminF('all')">Tümü</button>` +
+    dansArr.map(d => `<button class="dtab ${adminFilter===d.id?'on':''}" onclick="setAdminF('${d.id}')">${d.name}</button>`).join('');
+  const imap = {ilgilendi:'İlgilendi',dusunuyor:'Düşünüyor',ilgilenmedi:'İlgilenmedi'};
+  const smap = {bekleyen:['s-bek','Bekleyen'],arandi:['s-a','Arandı'],gorusuldu:['s-g','Görüşüldü'],ulasilamadi:['s-u','Ulaşılamadı'],takip:['s-t','Takip'],ilgisiz:['s-i','İlgisiz']};
+  const tableEl = ge('admin-table');
+  if (tableEl) tableEl.innerHTML = filtered.length ? `<div style="background:var(--card);border:1px solid var(--border);border-radius:11px;overflow:hidden">
+    <table class="vtable"><thead><tr><th>#</th><th>İsim</th><th>Tel</th><th>Proje</th><th>Portföy</th><th>Danışman</th><th>Durum</th><th>İlgi</th><th>Not</th></tr></thead><tbody>
+    ${filtered.map((c,i) => {
+      const proj=PROJECTS.find(p=>p.id===c.project_id);
+      const port=PORTFOLIOS.find(p=>p.id===c.portfolio_id);
+      const consul=PROFILES.find(p=>p.id===c.assigned_consultant_id);
+      const sm=smap[c.status]||['s-bek','Bekleyen'];
+      return `<tr><td>${i+1}</td><td class="link" onclick="goToCustomer('${c.id}')">${c.name}</td><td>${c.phone||'—'}</td><td style="font-size:11px">${proj?proj.name:'—'}</td><td style="font-size:11px;color:var(--purple)">${port?port.title:'—'}</td><td style="font-size:11px">${consul?consul.name:'—'}</td><td><span class="sbadge ${sm[0]}">${sm[1]}</span></td><td>${imap[c.interest_status]||'—'}</td><td style="font-size:11px;color:var(--muted)">${c.notes?c.notes.slice(0,28)+(c.notes.length>28?'…':''):'—'}</td></tr>`;
+    }).join('')}
+    </tbody></table></div>` : '<div class="empty">Kayıt yok.</div>';
+}
+function setAdminF(id) { adminFilter = id; renderAdmin(); }
+async function addDanisan() {
+  const name = ge('new-dan-name').value.trim(), pin = ge('new-dan-pin').value.trim();
+  if (!name || !pin) return;
+  if (PROFILES.some(p => p.pin === pin)) { flash('Bu PIN zaten kullanımda!', true); return; }
+  const { data, error } = await db.from('profiles').insert({ name, pin, role: 'danisan', groups: 'all' }).select().single();
+  if (error) { flash('Hata: ' + error.message, true); return; }
+  PROFILES.push(data);
+  ge('new-dan-name').value = ''; ge('new-dan-pin').value = '';
+  flash('Danışman eklendi'); renderAdmin();
+}
+async function delDanisan(id, name) {
+  if (!confirm('"' + name + '" silinsin mi?')) return;
+  await db.from('profiles').update({ is_active: false }).eq('id', id);
+  PROFILES = PROFILES.filter(p => p.id !== id);
+  flash('Danışman silindi'); renderAdmin();
+}
+
+// ═══ SEARCHABLE SELECT ═════════════════════════════════════
+function buildProjSS(ddId, valId, q) {
+  const dd = ge(ddId); if (!dd) return;
+  const ql = (q || '').toLowerCase();
+  const opts = PROJECTS.filter(p => !ql || p.name.toLowerCase().includes(ql));
+  dd.innerHTML = opts.length
+    ? opts.map(p => `<div class="ss-opt" onmousedown="selSS('${ddId}','${valId}','${p.id}','${p.name.replace(/'/g,"\'")}')">${p.name}</div>`).join('')
+    : '<div class="ss-none">Proje bulunamadı</div>';
+  dd.classList.add('open');
+}
+function buildPortSS(ddId, valId, q, projId) {
+  const dd = ge(ddId); if (!dd) return;
+  const ql = (q || '').toLowerCase();
+  let opts = PORTFOLIOS;
+  if (projId) opts = opts.filter(p => p.project_id === projId);
+  opts = opts.filter(p => !ql || p.title.toLowerCase().includes(ql));
+  dd.innerHTML = opts.length
+    ? opts.map(p => `<div class="ss-opt" onmousedown="selSS('${ddId}','${valId}','${p.id}','${p.title.replace(/'/g,"\'")}')">${p.title}</div>`).join('')
+    : '<div class="ss-none">Portföy bulunamadı</div>';
+  dd.classList.add('open');
+}
+function selSS(ddId, valId, id, name) {
+  const srchId = ddId.replace('-dd','-srch');
+  const s = ge(srchId); if (s) s.value = name;
+  const v = ge(valId); if (v) v.value = id;
+  closeSS(ddId);
+}
+function closeSS(id) { const el = ge(id); if (el) el.classList.remove('open'); }
+
+// ═══ XML IMPORT ════════════════════════════════════════════
+let xmlImportData = [];
+function xmlFileSelect(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => file.name.endsWith('.csv') ? parseCSV(e.target.result) : parseXML(e.target.result);
+  reader.readAsText(file, 'UTF-8');
+}
+function parseCSV(text) {
+  const lines = text.split('\n').filter(l => l.trim());
+  if (!lines.length) return;
+  const headers = lines[0].split(/[,;]/).map(h => h.trim().toLowerCase());
+  const ni = headers.findIndex(h => h.includes('isim')||h.includes('ad')||h.includes('name'));
+  const pi = headers.findIndex(h => h.includes('tel')||h.includes('phone')||h.includes('gsm'));
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(/[,;]/).map(c => c.trim().replace(/^"|"$/g,''));
+    const n = ni >= 0 ? cols[ni] : cols[0];
+    const p = pi >= 0 ? cols[pi] : (cols[1] || '');
+    if (n && n.length > 1) rows.push({ name: n, phone: p });
+  }
+  showXmlPreview(rows);
+}
+function parseXML(text) {
+  try {
+    const doc = new DOMParser().parseFromString(text, 'text/xml');
+    const rows = [];
+    doc.querySelectorAll('*').forEach(el => {
+      const nameEl = el.querySelector('isim,ad,name,AdSoyad') || [...el.children].find(c => /isim|ad|name/i.test(c.tagName));
+      const telEl = el.querySelector('telefon,tel,phone,gsm') || [...el.children].find(c => /tel|phone|gsm/i.test(c.tagName));
+      if (nameEl && nameEl.textContent.trim().length > 1)
+        rows.push({ name: nameEl.textContent.trim(), phone: telEl ? telEl.textContent.trim() : '' });
+    });
+    showXmlPreview(rows.length ? rows : []);
+  } catch(e) {
+    const xp = ge('xml-preview'); if(xp) xp.innerHTML = '<div style="color:var(--red);padding:8px">Ayrıştırılamadı.</div>';
+  }
+}
+function showXmlPreview(rows) {
+  xmlImportData = rows;
+  const xp = ge('xml-preview'); if (!xp) return;
+  if (!rows.length) { xp.innerHTML = '<div style="color:var(--red);padding:8px">Kayıt bulunamadı.</div>'; return; }
+  xp.innerHTML = `<div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px">${rows.length} kayıt:</div>` +
+    rows.slice(0,8).map(r => `<div class="xml-row"><strong>${r.name}</strong> · ${r.phone||'—'}</div>`).join('') +
+    (rows.length > 8 ? `<div class="xml-row" style="color:var(--muted)">+ ${rows.length-8} daha...</div>` : '');
+  const xpr = ge('xml-proj-row'); if(xpr) xpr.style.display = 'block';
+  const xa = ge('xml-actions'); if(xa) xa.style.display = 'flex';
+}
+function xmlReset() {
+  xmlImportData = [];
+  const xp=ge('xml-preview'); if(xp) xp.innerHTML='';
+  const xpr=ge('xml-proj-row'); if(xpr) xpr.style.display='none';
+  const xa=ge('xml-actions'); if(xa) xa.style.display='none';
+  const xf=ge('xml-file'); if(xf) xf.value='';
+}
+async function xmlImport() {
+  if (!xmlImportData.length) return;
+  const projId = ge('xml-proj-id') ? ge('xml-proj-id').value || null : null;
+  const today = new Date().toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric'});
+  const rows = xmlImportData.map(r => ({
+    name: r.name, phone: r.phone || '', project_id: projId,
+    status: 'bekleyen', created_by: CUR.id, assigned_consultant_id: CUR.id,
+    notes: 'XML/CSV import – ' + today
+  }));
+  const { data, error } = await db.from('customers').insert(rows).select();
+  if (error) { flash('Hata: ' + error.message, true); return; }
+  CUSTOMERS.push(...(data || []));
+  closeMo('mo-xml'); xmlReset();
+  flash(rows.length + ' kayıt eklendi'); renderAll();
+}
+
+// ═══ PDF ═══════════════════════════════════════════════════
+function generatePdf() {
+  const scope = document.querySelector('input[name="ps"]:checked').value;
+  closeMo('mo-pdf');
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const N=[26,60,94],O=[232,81,26],G=[46,107,62],L=[240,245,250],B=[221,227,234];
+  const pw=210,ph=297,M=14,IW=pw-M*2;
+  let y=16, pn=1;
+  const nPage=()=>{doc.addPage();y=16;pn++;doc.setFillColor(...N);doc.rect(0,0,pw,10,'F');doc.setFontSize(7);doc.setTextColor(255,255,255);doc.text('Voyage Gayrimenkul',M,6.5);doc.text('Sayfa '+pn,pw-M,6.5,{align:'right'});y=16;};
+  doc.setFillColor(...N);doc.rect(0,0,pw,22,'F');
+  doc.setFontSize(14);doc.setFont('helvetica','bold');doc.setTextColor(255,255,255);doc.text('Voyage Gayrimenkul',M,10);
+  doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(200,220,240);
+  const lbl={monthly:'Aylık Özet',all:'Tüm Müşteriler',gorusuldu:'Görüşülenler',bekleyen:'Bekleyenler'}[scope]||'Rapor';
+  doc.text(lbl+' · '+new Date().toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric'}),M,16);
+  y=28;
+  const mine = myCustomers();
+  if (scope === 'monthly') {
+    const thisMonth = new Date().toISOString().slice(0,7);
+    const addedThisMonth = mine.filter(c=>c.created_at&&c.created_at.startsWith(thisMonth)).length;
+    const gor = mine.filter(c=>c.status==='gorusuldu').length;
+    const bek = mine.filter(c=>['bekleyen','arandi','ulasilamadi','takip'].includes(c.status)).length;
+    doc.setFillColor(...L);doc.rect(M,y,IW,36,'F');doc.setDrawColor(...B);doc.setLineWidth(.3);doc.rect(M,y,IW,36,'S');
+    doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(...N);
+    doc.text('AYLIK ÖZET — '+new Date().toLocaleDateString('tr-TR',{month:'long',year:'numeric'}).toUpperCase(),M+4,y+7);
+    doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(60,60,80);
+    doc.text('Bu ay eklenen: '+addedThisMonth,M+4,y+15);doc.text('Görüşüldü: '+gor,M+4,y+22);doc.text('Bekliyor: '+bek,M+4,y+29);
+    doc.text('Toplam: '+mine.length,M+70,y+15);doc.text('Portföy: '+PORTFOLIOS.length,M+70,y+22);doc.text('Proje: '+PROJECTS.length,M+70,y+29);
+    y+=42;
+    doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(...N);doc.text('DANIŞMAN BAZLI',M,y);y+=6;
+    PROFILES.filter(p=>p.role==='danisan').forEach(d=>{
+      const cnt=mine.filter(c=>c.assigned_consultant_id===d.id).length;
+      const dG=mine.filter(c=>c.assigned_consultant_id===d.id&&c.status==='gorusuldu').length;
+      doc.setFillColor(248,250,252);doc.rect(M,y,IW,10,'F');doc.setDrawColor(...B);doc.setLineWidth(.2);doc.rect(M,y,IW,10,'S');
+      doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(...N);doc.text(d.name,M+4,y+7);
+      doc.setFont('helvetica','normal');doc.setTextColor(80,80,100);doc.text('Toplam: '+cnt+' · Görüşüldü: '+dG,M+80,y+7);
+      y+=12;
+    });
+  } else {
+    let list = mine;
+    if (scope==='gorusuldu') list=list.filter(c=>c.status==='gorusuldu');
+    else if (scope==='bekleyen') list=list.filter(c=>['bekleyen','arandi','ulasilamadi','takip'].includes(c.status));
+    doc.setFillColor(...L);doc.rect(M,y,IW,12,'F');doc.setDrawColor(...B);doc.setLineWidth(.3);doc.rect(M,y,IW,12,'S');
+    doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(...N);
+    doc.text('Toplam: '+list.length,M+4,y+8);doc.text(CUR.name,pw-M-4,y+8,{align:'right'});
+    y+=18;
+    const sL={bekleyen:'Bekleyen',arandi:'Arandı',gorusuldu:'Görüşüldü',ulasilamadi:'Ulaşılamadı',takip:'Takip',ilgisiz:'İlgisiz'};
+    list.forEach((c,i)=>{
+      if(y+20>ph-14)nPage();
+      const proj=PROJECTS.find(p=>p.id===c.project_id);
+      const consul=PROFILES.find(p=>p.id===c.assigned_consultant_id);
+      doc.setFillColor(...(i%2===0?L:[255,255,255]));doc.rect(M,y,IW,18,'F');doc.setDrawColor(...B);doc.setLineWidth(.2);doc.rect(M,y,IW,18,'S');
+      doc.setFillColor(...O);doc.rect(M,y,8,18,'F');doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(255,255,255);doc.text(String(i+1),M+4,y+11,{align:'center'});
+      doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(...N);doc.text(c.name.slice(0,28),M+11,y+7);
+      doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(100,120,140);doc.text(c.phone||'—',M+11,y+13);
+      if(proj){doc.setFontSize(7);doc.setTextColor(...N);doc.text(proj.name.slice(0,20),M+80,y+7);}
+      if(consul){doc.setFontSize(7);doc.text(consul.name.split(' ')[0],M+80,y+13);}
+      doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(80,80,100);doc.text(sL[c.status]||c.status,M+140,y+7);
+      y+=19;
+    });
+  }
+  doc.setFillColor(...N);doc.rect(0,ph-8,pw,8,'F');
+  doc.setFontSize(7);doc.setFont('helvetica','normal');doc.setTextColor(180,200,220);
+  doc.text('Voyage Gayrimenkul · voyagestate.com',M,ph-3);doc.text(new Date().toLocaleDateString('tr-TR'),pw-M,ph-3,{align:'right'});
+  doc.save('voyage-rapor-'+new Date().toISOString().slice(0,10)+'.pdf');
+}
+
+// ═══ PAGE SWITCH ═══════════════════════════════════════════
+function switchPage(page, tab) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
+  document.querySelectorAll('.ntab').forEach(t => t.classList.remove('on'));
+  const pg = ge('page-'+page); if(pg) pg.classList.add('on');
+  if (tab) tab.classList.add('on');
+  if (page === 'customers') renderCustomers();
+  if (page === 'portfolios') renderPortfolios();
+  if (page === 'projects') renderProjects();
+  if (page === 'admin') renderAdmin();
+}
+
 // ═══ UTILS ═══════════════════════════════════════════════
 function ge(id) { return document.getElementById(id); }
 function openMo(id) { const el = ge(id); if(el) el.classList.add('open'); }
