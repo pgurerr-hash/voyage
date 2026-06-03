@@ -1080,6 +1080,28 @@ function renderProjects() {
     </div></div>`;
   }).join('');
 }
+
+// ═══ UTILS ═══════════════════════════════════════════════
+function ge(id) { return document.getElementById(id); }
+function openMo(id) { const el = ge(id); if(el) el.classList.add('open'); }
+function closeMo(id) { const el = ge(id); if(el) el.classList.remove('open'); }
+function flash(msg, isErr) {
+  const f = ge('flash');
+  if (!f) return;
+  f.textContent = (isErr ? '✗ ' : '✓ ') + (msg || 'Kaydedildi');
+  f.style.background = isErr ? 'var(--red)' : 'var(--green)';
+  f.style.display = 'block';
+  setTimeout(() => f.style.display = 'none', 2500);
+}
+
+['mo-cust','mo-proj','mo-port','mo-xml','mo-pdf','mo-del'].forEach(id => {
+  const el = ge(id);
+  if (el) el.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('open'); });
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') ['mo-cust','mo-proj','mo-port','mo-xml','mo-pdf','mo-del'].forEach(id => { const el=ge(id); if(el) el.classList.remove('open'); });
+});
+
 </script>
 </body>
 </html>
