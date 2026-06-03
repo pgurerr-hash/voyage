@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voyage CRM</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--navy:#1a3c5e;--navy2:#2a5280;--orange:#e8511a;--green:#2e6b3e;--purple:#7a5c99;--gold:#c9a227;--red:#c0392b;--bg:#f4f6f9;--card:#fff;--border:#dde3ea;--text:#1a2533;--muted:#7a8fa6;--font:'Montserrat',sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;font-size:13px}
+
+/* LOGIN */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#0f2540,#1a3c5e 60%,#2a5e3e)}
+.lbox{background:#fff;border-radius:20px;padding:2.5rem 2rem;width:320px;box-shadow:0 24px 60px rgba(0,0,0,.3);text-align:center}
+.llogo{font-size:24px;font-weight:700;color:var(--navy);letter-spacing:3px;margin-bottom:2px}
+.lsub{font-size:10px;color:var(--muted);margin-bottom:2rem;letter-spacing:1.5px}
+.llbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:6px;text-align:left}
+.linp{width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:24px;letter-spacing:8px;text-align:center;outline:none;color:var(--navy);font-weight:700;margin-bottom:10px}
+.linp:focus{border-color:var(--navy)}
+.lbtn{width:100%;padding:12px;background:var(--navy);color:#fff;border:none;border-radius:10px;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer}
+.lbtn:hover{background:var(--navy2)}
+.lerr{color:var(--red);font-size:12px;margin-top:6px;min-height:16px}
+.lload{color:var(--muted);font-size:12px;margin-top:6px}
+
+/* APP */
+#app{display:none}
+.topbar{background:var(--navy);padding:0 1.25rem;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;box-shadow:0 2px 10px rgba(0,0,0,.2);gap:8px}
+.tb-brand{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.tb-logo{width:26px;height:26px;background:var(--orange);border-radius:5px;display:flex;align-items:center;justify-content:center}
+.tb-logo svg{width:15px;height:15px;fill:#fff}
+.tb-title{color:#fff;font-size:13px;font-weight:700}
+.tb-stats{display:flex;gap:12px}
+.tst{text-align:center}
+.tst-n{color:#fff;font-size:15px;font-weight:700;line-height:1}
+.tst-n.g{color:#6ee09a}.tst-n.o{color:#ffb07a}.tst-n.b{color:#7ec8e3}
+.tst-l{color:rgba(255,255,255,.5);font-size:9px;font-weight:600;text-transform:uppercase;margin-top:1px}
+.tb-right{display:flex;align-items:center;gap:5px}
+.tb-user{background:rgba(255,255,255,.15);color:#fff;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap}
+.tb-role{font-size:10px;color:rgba(255,255,255,.6);background:rgba(255,255,255,.1);padding:2px 7px;border-radius:10px}
+.tbtn{display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:7px;border:none;font-family:var(--font);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.tbtn-add{background:var(--orange);color:#fff}.tbtn-add:hover{background:#d44515}
+.tbtn-proj{background:var(--green);color:#fff}
+.tbtn-port{background:var(--purple);color:#fff}
+.tbtn-pdf{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.25)}
+.tbtn-out{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.12)}
+.admin-only{display:none}
+
+/* NAV */
+.nav-tabs{background:var(--card);border-bottom:2px solid var(--border);display:flex;padding:0 1.25rem;position:sticky;top:52px;z-index:100}
+.ntab{padding:11px 15px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s;white-space:nowrap;display:flex;align-items:center;gap:5px}
+.ntab:hover{color:var(--navy)}.ntab.on{color:var(--navy);border-bottom-color:var(--orange)}
+.nbadge{background:var(--bg);color:var(--muted);font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px}
+.ntab.on .nbadge{background:#e8f0f8;color:var(--navy)}
+
+/* LAYOUT */
+.layout{display:flex;min-height:calc(100vh - 103px)}
+.sidebar{width:190px;min-width:190px;background:var(--card);border-right:1px solid var(--border);padding:.875rem 0;position:sticky;top:103px;height:calc(100vh - 103px);overflow-y:auto}
+.sb-sec{padding:0 .625rem .5rem}
+.sb-lbl{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:0 .5rem;margin-bottom:3px}
+.sbtn{display:flex;align-items:center;gap:6px;width:100%;padding:6px 8px;border:none;background:none;border-radius:7px;font-family:var(--font);font-size:12px;font-weight:500;color:var(--text);cursor:pointer;text-align:left;transition:background .12s;margin-bottom:1px}
+.sbtn:hover{background:var(--bg)}.sbtn.on{background:#e8f0f8;color:var(--navy);font-weight:600}
+.sb-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.sb-cnt{margin-left:auto;font-size:10px;color:var(--muted);background:var(--bg);padding:1px 5px;border-radius:8px}
+.sb-div{height:1px;background:var(--border);margin:5px .625rem}
+.main{flex:1;padding:1.25rem;overflow-y:auto;min-width:0}
+.page{display:none}.page.on{display:block}
+
+/* FILTER BAR */
+.fbar{display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap;align-items:center}
+.fbtn{padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:var(--card);font-family:var(--font);font-size:11px;font-weight:500;color:var(--text);cursor:pointer;transition:all .12s}
+.fbtn:hover{border-color:var(--navy);color:var(--navy)}
+.fbtn.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.fbtn.on-g{background:var(--green);color:#fff;border-color:var(--green)}
+.fbtn.on-o{background:var(--orange);color:#fff;border-color:var(--orange)}
+.srch{margin-left:auto;position:relative}
+.srch input{padding:5px 10px 5px 27px;border-radius:20px;border:1px solid var(--border);font-family:var(--font);font-size:12px;outline:none;width:175px;background:var(--card);color:var(--text)}
+.srch input:focus{border-color:var(--navy)}
+.srch-i{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:11px;pointer-events:none}
+
+/* CUSTOMER CARD */
+.cust-card{background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:.625rem;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.cust-row{display:flex;align-items:center;padding:0;cursor:pointer;min-height:50px;transition:background .1s;gap:0}
+.cust-row:hover{background:#f8fafc}
+.cust-num{width:34px;min-width:34px;height:50px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;background:var(--orange);flex-shrink:0;border-radius:10px 0 0 0}
+.cust-info{flex:1;padding:0 10px;min-width:0}
+.cust-name{font-size:13px;font-weight:600;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cust-phone{font-size:11px;color:var(--muted)}
+.cust-tags{display:flex;align-items:center;gap:3px;flex-wrap:nowrap;overflow:hidden;padding:0 6px}
+.cust-right{display:flex;align-items:center;gap:3px;padding-right:8px;flex-shrink:0}
+.icon-btn{background:none;border:none;cursor:pointer;color:#bbb;font-size:12px;padding:3px;border-radius:4px;line-height:1}
+.icon-btn:hover{color:var(--red)}.icon-btn.edit:hover{color:var(--navy)}
+.cdot{width:9px;height:9px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.cdot.done{background:var(--green);border-color:var(--green)}
+.cdot.prog{background:var(--orange);border-color:var(--orange)}
+.cdot.warn{background:#e6b000;border-color:#e6b000}
+.cdot.gray{background:#aaa;border-color:#aaa}
+.dan-chip{font-size:10px;background:#e8f0f8;color:var(--navy);padding:1px 6px;border-radius:6px;font-weight:600;white-space:nowrap;flex-shrink:0}
+
+/* BADGES */
+.sbadge{display:inline-block;padding:2px 6px;border-radius:8px;font-size:10px;font-weight:600;white-space:nowrap}
+.s-bek{background:#f0f0f0;color:#666}
+.s-g{background:#d4edda;color:#1e6b36}.s-u{background:#fde0de;color:#9c2f2f}
+.s-t{background:#fff3cd;color:#856404}.s-a{background:#dde8f5;color:#1a3c5e}
+.s-i{background:#eee;color:#555}
+.ibadge{display:inline-block;padding:2px 6px;border-radius:8px;font-size:10px;font-weight:600;white-space:nowrap}
+.ib-y{background:#d4edda;color:#1e6b36}.ib-m{background:#fff3cd;color:#856404}.ib-n{background:#fde0de;color:#9c2f2f}
+.tbadge{display:inline-flex;align-items:center;font-size:9px;font-weight:600;padding:2px 5px;border-radius:7px;white-space:nowrap}
+.tb-s{background:#dde8f5;color:var(--navy)}.tb-ok{background:#d4edda;color:var(--green)}.tb-m{background:#fde0de;color:var(--red)}
+
+/* DETAIL PANEL */
+.cust-detail{display:none;padding:12px 12px 14px 34px;background:#f8fafc;border-top:1px solid var(--border)}
+.cust-detail.open{display:block}
+.dgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px}
+.dfield label{display:block;font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px}
+.dfield select,.dfield textarea,.dfield input[type=text],.dfield input[type=date],.dfield input[type=time]{width:100%;font-family:var(--font);font-size:12px;border:1px solid var(--border);border-radius:7px;padding:5px 8px;background:var(--card);color:var(--text);outline:none}
+.dfield select:focus,.dfield textarea:focus,.dfield input:focus{border-color:var(--navy)}
+.dfield textarea{resize:vertical;min-height:52px}
+.takip-box{background:#fff;border:1px solid var(--border);border-radius:9px;padding:9px;margin-bottom:8px}
+.takip-title{font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px}
+.takip-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+.tdone{display:flex;align-items:center;gap:5px;margin-top:6px;font-size:12px;font-weight:600;color:var(--green)}
+.dactions{display:flex;align-items:center;gap:7px;margin-top:8px}
+.save-btn{background:var(--navy);color:#fff;border:none;border-radius:7px;padding:6px 14px;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer}
+.save-btn:hover{background:var(--navy2)}
+
+/* TODAY ALERT */
+.today-bar{background:#fff8e1;border:1px solid #ffe082;border-radius:9px;padding:8px 12px;margin-bottom:.875rem;display:flex;align-items:center;gap:7px;font-size:12px;color:#7a5800}
+
+/* CUSTOMERS PAGE - Project sections */
+.proj-section{background:var(--card);border:1px solid var(--border);border-radius:11px;overflow:hidden;margin-bottom:.875rem}
+.proj-sec-hdr{padding:9px 13px;display:flex;align-items:center;justify-content:space-between;cursor:pointer}
+.proj-sec-hdr.inci{background:var(--navy);color:#fff}
+.proj-sec-hdr.atilgan{background:var(--green);color:#fff}
+.proj-sec-hdr.other{background:var(--purple);color:#fff}
+.proj-sec-title{font-size:13px;font-weight:700}
+.proj-sec-count{font-size:11px;opacity:.75}
+
+/* TABLE */
+.vtable{width:100%;border-collapse:collapse}
+.vtable th{padding:7px 10px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:left;border-bottom:1px solid var(--border);background:var(--bg)}
+.vtable td{padding:7px 10px;font-size:12px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}
+.vtable tr:last-child td{border-bottom:none}
+.vtable tr:hover td{background:#f8fafc;cursor:pointer}
+.link{color:var(--navy);font-weight:600;cursor:pointer}
+.link:hover{text-decoration:underline}
+
+/* PROJECTS PAGE */
+.proj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(275px,1fr));gap:.875rem;margin-bottom:.875rem}
+.pcard{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.pcard-hdr{padding:11px 13px;color:#fff;display:flex;align-items:flex-start;justify-content:space-between}
+.pcard-hdr.inci{background:var(--navy)}.pcard-hdr.atilgan{background:var(--green)}.pcard-hdr.other{background:var(--purple)}.pcard-hdr.gold{background:var(--gold)}
+.pcard-name{font-size:14px;font-weight:700}
+.pcard-dev{font-size:9px;background:rgba(255,255,255,.25);padding:2px 7px;border-radius:8px;font-weight:600;margin-top:3px;display:inline-block}
+.pcard-act{display:flex;gap:4px}
+.p-act-btn{background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:5px;padding:3px 7px;font-family:var(--font);font-size:10px;font-weight:600;cursor:pointer}
+.p-act-btn:hover{background:rgba(255,255,255,.35)}
+.p-act-btn.del:hover{background:rgba(200,50,50,.5)}
+.pcard-body{padding:12px 13px}
+.pspecs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:9px}
+.pspec label{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:1px}
+.pspec .sv{font-size:12px;font-weight:600}
+.price-row{display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;gap:6px}
+.price-row:last-child{border-bottom:none}
+.price-row .pl{color:var(--muted);flex:1}
+.price-row .pv{font-weight:700;color:var(--navy);flex-shrink:0}
+.price-del{background:none;border:none;color:#ccc;cursor:pointer;font-size:12px;padding:1px 4px}
+.price-del:hover{color:var(--red)}
+.add-price-row{display:flex;gap:6px;margin-top:6px}
+.add-price-row input{flex:1;font-family:var(--font);font-size:12px;border:1px solid var(--border);border-radius:7px;padding:5px 8px;outline:none;background:var(--bg)}
+.add-price-row button{background:var(--navy);color:#fff;border:none;border-radius:7px;padding:5px 10px;font-family:var(--font);font-size:11px;font-weight:600;cursor:pointer}
+.pnote{font-family:var(--font);font-size:12px;border:1px solid var(--border);border-radius:7px;padding:6px 8px;width:100%;resize:vertical;min-height:52px;outline:none;background:var(--bg)}
+.pnote:focus{border-color:var(--navy)}
+.psave{margin-top:6px;background:var(--navy);color:#fff;border:none;border-radius:7px;padding:5px 12px;font-family:var(--font);font-size:11px;font-weight:600;cursor:pointer}
+.proj-cust-box{margin-top:9px;border-top:1px solid var(--border);padding-top:9px}
+.proj-cust-title{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+
+/* PORTFOLIOS */
+.port-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:.75rem;margin-bottom:.875rem}
+.portcard{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:11px 13px;transition:all .12s}
+.portcard:hover{border-color:var(--navy);box-shadow:0 2px 8px rgba(26,60,94,.1)}
+.portcard.sel{border-color:var(--navy);border-width:2px}
+.portcard-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:5px;gap:6px}
+.portcard-name{font-size:13px;font-weight:700;color:var(--navy);flex:1;cursor:pointer}
+.portcard-name:hover{text-decoration:underline}
+.portcard-acts{display:flex;gap:3px;flex-shrink:0}
+.port-act{background:var(--bg);border:1px solid var(--border);color:var(--muted);border-radius:5px;padding:2px 6px;font-family:var(--font);font-size:10px;font-weight:600;cursor:pointer}
+.port-act:hover{border-color:var(--navy);color:var(--navy)}
+.port-act.del:hover{border-color:var(--red);color:var(--red)}
+.portcard-proj{font-size:10px;color:var(--muted);background:var(--bg);padding:2px 7px;border-radius:7px;font-weight:600;display:inline-block;margin-bottom:5px}
+.portcard-by{font-size:10px;font-weight:700;color:var(--purple);margin-bottom:5px}
+.portcard-meta{font-size:11px;color:var(--muted);margin-bottom:5px}
+.portcard-stats{display:flex;gap:9px}
+.portcard-stat{font-size:11px}.portcard-stat span{font-weight:700;color:var(--navy)}
+.port-detail-box{background:var(--card);border:1px solid var(--border);border-radius:11px;overflow:hidden;margin-top:.75rem}
+.port-det-hdr{padding:9px 13px;background:var(--bg);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+
+/* ADMIN PANEL */
+.admin-stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1rem}
+.astat{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:10px 12px;text-align:center}
+.astat-n{font-size:20px;font-weight:700;color:var(--navy)}
+.astat-l{font-size:10px;color:var(--muted);margin-top:1px}
+.dtabs{display:flex;gap:5px;margin-bottom:.875rem;flex-wrap:wrap}
+.dtab{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--card);font-family:var(--font);font-size:12px;font-weight:500;color:var(--text);cursor:pointer}
+.dtab.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+
+/* SS (searchable select) */
+.ss-wrap{position:relative}
+.ss-inp{width:100%;font-family:var(--font);font-size:12px;border:1px solid var(--border);border-radius:7px;padding:5px 8px;background:var(--card);color:var(--text);outline:none}
+.ss-inp:focus{border-color:var(--navy)}
+.ss-dd{display:none;position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.12);z-index:400;max-height:170px;overflow-y:auto;margin-top:2px}
+.ss-dd.open{display:block}
+.ss-opt{padding:7px 10px;font-size:12px;cursor:pointer;color:var(--text)}
+.ss-opt:hover{background:#f0f5fb;color:var(--navy)}
+.ss-none{padding:7px 10px;font-size:12px;color:var(--muted)}
+
+/* MODALS */
+.mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;align-items:center;justify-content:center}
+.mo.open{display:flex}
+.mbox{background:var(--card);border-radius:15px;padding:1.5rem;width:520px;max-width:96vw;box-shadow:0 20px 60px rgba(0,0,0,.25);max-height:92vh;overflow-y:auto}
+.mbox.sm{width:380px}.mbox.md{width:460px}
+.mtitle{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:1.1rem}
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:9px}
+.mfield label{display:block;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px}
+.mfield input,.mfield select,.mfield textarea{width:100%;font-family:var(--font);font-size:13px;border:1px solid var(--border);border-radius:8px;padding:7px 10px;background:var(--bg);color:var(--text);outline:none}
+.mfield input:focus,.mfield select:focus,.mfield textarea:focus{border-color:var(--navy);background:#fff}
+.mfield.full{grid-column:1/-1}
+.mact{display:flex;justify-content:flex-end;gap:7px;margin-top:1.1rem}
+.mcancel{background:none;border:1px solid var(--border);border-radius:8px;padding:6px 14px;font-family:var(--font);font-size:13px;cursor:pointer;color:var(--muted)}
+.msubmit{background:var(--navy);color:#fff;border:none;border-radius:8px;padding:6px 18px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer}
+.msubmit:hover{background:var(--navy2)}
+.msubmit-g{background:var(--green);color:#fff;border:none;border-radius:8px;padding:6px 18px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer}
+.mdanger{background:var(--red);color:#fff;border:none;border-radius:8px;padding:6px 18px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer}
+.pdf-opt{display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;cursor:pointer;margin-bottom:6px}
+.pdf-opt:hover{border-color:var(--navy);background:#f0f5fb}
+.pdf-opt input{accent-color:var(--navy)}
+.pdf-ol{font-size:13px;font-weight:600}
+.pdf-os{font-size:11px;color:var(--muted)}
+.xml-drop{border:2px dashed var(--border);border-radius:10px;padding:2rem;text-align:center;cursor:pointer;color:var(--muted);font-size:13px}
+.xml-drop:hover,.xml-drop.drag{border-color:var(--navy);background:#f0f5fb;color:var(--navy)}
+.xml-preview{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;margin-top:10px;max-height:180px;overflow-y:auto}
+.xml-row{padding:4px 0;border-bottom:1px solid var(--border);font-size:12px}
+.xml-row:last-child{border-bottom:none}
+
+.page-title{font-size:17px;font-weight:700;color:var(--navy);margin-bottom:.875rem}
+.add-box{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:1.1rem;margin-bottom:1rem}
+.add-box-title{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:.875rem}
+.cust-stat-row{display:flex;gap:8px;margin-bottom:.875rem;flex-wrap:wrap}
+.cstat{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:9px 12px;text-align:center;flex:1;min-width:80px}
+.cstat-n{font-size:19px;font-weight:700;color:var(--navy)}
+.cstat-l{font-size:10px;color:var(--muted);margin-top:1px}
+.empty{padding:2.5rem;text-align:center;color:var(--muted);font-size:14px}
+.flash{position:fixed;bottom:18px;right:18px;background:var(--green);color:#fff;padding:8px 16px;border-radius:9px;font-size:13px;font-weight:600;display:none;z-index:999;box-shadow:0 4px 14px rgba(0,0,0,.2)}
+.loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="lbox">
+    <div class="llogo">VOYAGE</div>
+    <div class="lsub">LUXURY REAL ESTATE · CRM</div>
+    <label class="llbl">PIN Kodunuz</label>
+    <input class="linp" id="pin-inp" type="password" maxlength="6" placeholder="••••" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="lbtn" onclick="doLogin()">Giriş Yap</button>
+    <div class="lerr" id="lerr"></div>
+    <div class="lload" id="lload"></div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loading" style="display:none">
+  <div class="spinner"></div>
+  <div style="font-size:13px;color:var(--muted);font-family:var(--font)">Yükleniyor...</div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="tb-brand">
+      <div class="tb-logo"><svg viewBox="0 0 16 16"><path d="M8 1L2 5v9h4V9h4v5h4V5L8 1z"/></svg></div>
+      <span class="tb-title">Voyage CRM</span>
+    </div>
+    <div class="tb-stats">
+      <div class="tst"><div class="tst-n" id="st-bek">—</div><div class="tst-l">Bekliyor</div></div>
+      <div class="tst"><div class="tst-n b" id="st-total">—</div><div class="tst-l">Toplam</div></div>
+      <div class="tst"><div class="tst-n g" id="st-gor">—</div><div class="tst-l">Görüşüldü</div></div>
+    </div>
+    <div class="tb-right">
+      <span class="tb-user" id="user-badge">—</span>
+      <span class="tb-role" id="role-badge">—</span>
+      <button class="tbtn tbtn-add" onclick="openCustModal()">＋ Müşteri</button>
+      <button class="tbtn tbtn-proj admin-only" onclick="openProjModal()">＋ Proje</button>
+      <button class="tbtn tbtn-port" onclick="openPortModal()">＋ Portföy</button>
+      <button class="tbtn tbtn-pdf admin-only" onclick="openMo('mo-pdf')">📄 Rapor</button>
+      <button class="tbtn tbtn-out" onclick="logout()">Çıkış</button>
+    </div>
+  </div>
+  <div class="nav-tabs">
+    <div class="ntab on" onclick="switchPage('calllist',this)">📋 Arama Listesi <span class="nbadge" id="nb-call">—</span></div>
+    <div class="ntab" onclick="switchPage('customers',this)">👥 Müşteriler <span class="nbadge" id="nb-cust">—</span></div>
+    <div class="ntab" onclick="switchPage('portfolios',this)">💼 Portföyler <span class="nbadge" id="nb-port">—</span></div>
+    <div class="ntab admin-only" onclick="switchPage('projects',this)">🏢 Projeler <span class="nbadge" id="nb-proj">—</span></div>
+    <div class="ntab admin-only" onclick="switchPage('admin',this)">⚙️ Yönetim</div>
+  </div>
+  <div class="layout">
+    <div class="sidebar">
+      <div class="sb-sec">
+        <div class="sb-lbl">Durum</div>
+        <button class="sbtn on" id="sf-all" onclick="setSideFilter('all',this)"><span class="sb-dot" style="background:#7a8fa6"></span>Tümü<span class="sb-cnt" id="sc-all">—</span></button>
+        <button class="sbtn" id="sf-bek" onclick="setSideFilter('bekleyen',this)"><span class="sb-dot" style="background:#ddd;border:1px solid #bbb"></span>Bekleyenler<span class="sb-cnt" id="sc-bek">—</span></button>
+        <button class="sbtn" id="sf-gor" onclick="setSideFilter('gorusuldu',this)"><span class="sb-dot" style="background:var(--green)"></span>Görüşüldü<span class="sb-cnt" id="sc-gor">0</span></button>
+        <button class="sbtn" id="sf-ula" onclick="setSideFilter('ulasilamadi',this)"><span class="sb-dot" style="background:var(--red)"></span>Ulaşılamadı<span class="sb-cnt" id="sc-ula">0</span></button>
+        <button class="sbtn" id="sf-tak" onclick="setSideFilter('takip',this)"><span class="sb-dot" style="background:#e6b000"></span>Takip<span class="sb-cnt" id="sc-tak">0</span></button>
+      </div>
+      <div class="sb-div"></div>
+      <div class="sb-sec">
+        <div class="sb-lbl">İlgi</div>
+        <button class="sbtn" onclick="setSideFilter('ilgilendi',this)"><span class="sb-dot" style="background:var(--green)"></span>İlgilendi<span class="sb-cnt" id="sc-il">0</span></button>
+        <button class="sbtn" onclick="setSideFilter('dusunuyor',this)"><span class="sb-dot" style="background:#e6b000"></span>Düşünüyor<span class="sb-cnt" id="sc-du">0</span></button>
+        <button class="sbtn" onclick="setSideFilter('ilgilenmedi',this)"><span class="sb-dot" style="background:var(--red)"></span>İlgilenmedi<span class="sb-cnt" id="sc-ilm">0</span></button>
+      </div>
+      <div class="sb-div"></div>
+      <div class="sb-sec" id="sb-proj-sec">
+        <div class="sb-lbl">Proje</div>
+        <div id="sb-proj-list"></div>
+      </div>
+    </div>
+    <div class="main">
+      <!-- ARAMA LİSTESİ -->
+      <div id="page-calllist" class="page on">
+        <div id="today-bar" style="display:none" class="today-bar"><b>⏰ Bugün takip:</b><span id="today-names"></span></div>
+        <div class="fbar">
+          <button class="fbtn on" id="cf-all" onclick="setCallFilter('all','cf-all')">Tümü</button>
+          <button class="fbtn" id="cf-bek" onclick="setCallFilter('bekleyen','cf-bek')">Bekleyenler</button>
+          <button class="fbtn" id="cf-gor" onclick="setCallFilter('gorusuldu','cf-gor')">Görüşülenler</button>
+          <div class="srch"><span class="srch-i">🔍</span><input id="call-search" type="text" placeholder="İsim veya tel..." oninput="renderCallList()"></div>
+        </div>
+        <div id="call-list"></div>
+      </div>
+      <!-- MÜŞTERİLER -->
+      <div id="page-customers" class="page">
+        <div class="cust-stat-row">
+          <div class="cstat"><div class="cstat-n" id="cs-tot">0</div><div class="cstat-l">Toplam</div></div>
+          <div class="cstat"><div class="cstat-n" style="color:var(--green)" id="cs-gor">0</div><div class="cstat-l">Görüşüldü</div></div>
+          <div class="cstat"><div class="cstat-n" style="color:#e6b000" id="cs-tak">0</div><div class="cstat-l">Takip</div></div>
+          <div class="cstat"><div class="cstat-n" style="color:var(--red)" id="cs-ula">0</div><div class="cstat-l">Ulaşılamadı</div></div>
+          <div class="cstat"><div class="cstat-n" style="color:var(--green)" id="cs-il">0</div><div class="cstat-l">İlgilendi</div></div>
+        </div>
+        <div class="fbar">
+          <button class="fbtn on" id="mf-all" onclick="setCustFilter('all','mf-all')">Tümü</button>
+          <button class="fbtn" id="mf-gor" onclick="setCustFilter('gorusuldu','mf-gor')">Görüşüldü</button>
+          <button class="fbtn" id="mf-tak" onclick="setCustFilter('takip','mf-tak')">Takip</button>
+          <button class="fbtn" id="mf-il" onclick="setCustFilter('ilgilendi','mf-il')">İlgilendi</button>
+          <div class="srch"><span class="srch-i">🔍</span><input id="cust-search" type="text" placeholder="İsim ara..." oninput="renderCustomers()"></div>
+        </div>
+        <div id="customers-list"></div>
+      </div>
+      <!-- PORTFÖYLER -->
+      <div id="page-portfolios" class="page">
+        <div class="page-title">💼 Portföyler</div>
+        <div class="port-grid" id="port-grid"></div>
+        <div id="port-detail"></div>
+      </div>
+      <!-- PROJELER -->
+      <div id="page-projects" class="page">
+        <div class="page-title">🏢 Projeler</div>
+        <div class="proj-grid" id="proj-grid"></div>
+      </div>
+      <!-- YÖNETİM -->
+      <div id="page-admin" class="page">
+        <div class="page-title">⚙️ Yönetim Paneli</div>
+        <div class="add-box">
+          <div class="add-box-title">👤 Danışmanlar</div>
+          <div id="dan-list"></div>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <input type="text" id="new-dan-name" placeholder="Ad soyad..." style="flex:1;font-family:var(--font);font-size:13px;border:1px solid var(--border);border-radius:8px;padding:7px 10px;outline:none;background:var(--bg)">
+            <input type="text" id="new-dan-pin" placeholder="PIN (4-6 hane)" style="width:120px;font-family:var(--font);font-size:13px;border:1px solid var(--border);border-radius:8px;padding:7px 10px;outline:none;background:var(--bg)">
+            <button class="msubmit" onclick="addDanisan()">Ekle</button>
+          </div>
+        </div>
+        <div class="admin-stat-grid" id="admin-stats"></div>
+        <div class="dtabs" id="dtabs"></div>
+        <div id="admin-table"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="flash" id="flash">✓ Kaydedildi</div>
+
+<!-- CUSTOMER MODAL -->
+<div class="mo" id="mo-cust">
+  <div class="mbox">
+    <div class="mtitle" id="cust-modal-title">➕ Yeni Müşteri Ekle</div>
+    <input type="hidden" id="edit-cust-id">
+    <div class="mgrid">
+      <div class="mfield full"><label>İsim Soyisim *</label><input type="text" id="nc-name" placeholder="Ad Soyad..."></div>
+      <div class="mfield"><label>Telefon</label><input type="text" id="nc-phone" placeholder="05xx xxx xx xx"></div>
+      <div class="mfield"><label>Proje *</label>
+        <div class="ss-wrap">
+          <input class="ss-inp" id="nc-proj-srch" type="text" placeholder="Proje seç..." autocomplete="off"
+            oninput="buildProjSS('nc-proj-dd','nc-proj-id',this.value)" onfocus="buildProjSS('nc-proj-dd','nc-proj-id',this.value)" onblur="setTimeout(()=>closeSS('nc-proj-dd'),150)">
+          <input type="hidden" id="nc-proj-id">
+          <div class="ss-dd" id="nc-proj-dd"></div>
+        </div></div>
+      <div class="mfield"><label>İlgili Portföy</label>
+        <div class="ss-wrap">
+          <input class="ss-inp" id="nc-port-srch" type="text" placeholder="Portföy ara..." autocomplete="off"
+            oninput="buildPortSS('nc-port-dd','nc-port-id',this.value,ge('nc-proj-id').value)" onfocus="buildPortSS('nc-port-dd','nc-port-id',this.value,ge('nc-proj-id').value)" onblur="setTimeout(()=>closeSS('nc-port-dd'),150)">
+          <input type="hidden" id="nc-port-id">
+          <div class="ss-dd" id="nc-port-dd"></div>
+        </div></div>
+      <div class="mfield"><label>Durum</label>
+        <select id="nc-status">
+          <option value="bekleyen">Bekleyen</option>
+          <option value="arandi">Arandı</option>
+          <option value="gorusuldu">Görüşüldü</option>
+          <option value="ulasilamadi">Ulaşılamadı</option>
+          <option value="takip">Takip Edilecek</option>
+          <option value="ilgisiz">İlgisiz</option>
+        </select></div>
+      <div class="mfield"><label>İlgi Durumu</label>
+        <select id="nc-interest">
+          <option value="">— Seçiniz —</option>
+          <option value="ilgilendi">İlgilendi</option>
+          <option value="dusunuyor">Düşünüyor</option>
+          <option value="ilgilenmedi">İlgilenmedi</option>
+        </select></div>
+      <div class="mfield admin-only"><label>Danışman Ata</label>
+        <select id="nc-consultant"><option value="">— Seçiniz —</option></select></div>
+      <div class="mfield full"><label>Not</label><textarea id="nc-notes" rows="2" placeholder="Kısa not..."></textarea></div>
+    </div>
+    <div class="mact"><button class="mcancel" onclick="closeMo('mo-cust')">İptal</button><button class="msubmit" id="cust-submit-btn" onclick="submitCustomer()">Ekle</button></div>
+  </div>
+</div>
+
+<!-- PROJECT MODAL -->
+<div class="mo" id="mo-proj">
+  <div class="mbox">
+    <div class="mtitle" id="proj-modal-title">🏢 Yeni Proje Ekle</div>
+    <input type="hidden" id="edit-proj-id">
+    <div class="mgrid">
+      <div class="mfield full"><label>Proje Adı *</label><input type="text" id="np-name" placeholder="İnci Mega..."></div>
+      <div class="mfield"><label>Geliştirici</label><input type="text" id="np-dev" placeholder="Önaylar Group..."></div>
+      <div class="mfield"><label>Renk</label>
+        <select id="np-color"><option value="other">Standart</option><option value="inci">Lacivert</option><option value="atilgan">Yeşil</option><option value="gold">Altın</option></select></div>
+      <div class="mfield"><label>Konum</label><input type="text" id="np-loc" placeholder="Karşıyaka, İzmir"></div>
+      <div class="mfield"><label>Teslim Tarihi</label><input type="text" id="np-del" placeholder="2030"></div>
+      <div class="mfield"><label>Oda Tipleri</label><input type="text" id="np-types" placeholder="1+1, 2+1, 3+1"></div>
+      <div class="mfield full"><label>Açıklama</label><textarea id="np-desc" rows="2"></textarea></div>
+    </div>
+    <div class="mact"><button class="mcancel" onclick="closeMo('mo-proj')">İptal</button><button class="msubmit" id="proj-submit-btn" onclick="submitProject()">Ekle</button></div>
+  </div>
+</div>
+
+<!-- PORTFOLIO MODAL -->
+<div class="mo" id="mo-port">
+  <div class="mbox">
+    <div class="mtitle" id="port-modal-title">💼 Yeni Portföy Ekle</div>
+    <input type="hidden" id="edit-port-id">
+    <div class="mgrid">
+      <div class="mfield full"><label>Portföy Adı *</label><input type="text" id="nport-name" placeholder="İnci Mega 3+1 Köşe..."></div>
+      <div class="mfield"><label>Proje *</label>
+        <div class="ss-wrap">
+          <input class="ss-inp" id="nport-proj-srch" type="text" placeholder="Proje seç..." autocomplete="off"
+            oninput="buildProjSS('nport-proj-dd','nport-proj-id',this.value)" onfocus="buildProjSS('nport-proj-dd','nport-proj-id',this.value)" onblur="setTimeout(()=>closeSS('nport-proj-dd'),150)">
+          <input type="hidden" id="nport-proj-id">
+          <div class="ss-dd" id="nport-proj-dd"></div>
+        </div></div>
+      <div class="mfield"><label>Daire Tipi</label><input type="text" id="nport-type" placeholder="3+1"></div>
+      <div class="mfield"><label>m² Net</label><input type="text" id="nport-net" placeholder="143 m²"></div>
+      <div class="mfield"><label>m² Brüt</label><input type="text" id="nport-brut" placeholder="243,1 m²"></div>
+      <div class="mfield"><label>Fiyat</label><input type="text" id="nport-price" placeholder="14.750.000 TL"></div>
+      <div class="mfield"><label>Kat / Cephe</label><input type="text" id="nport-floor" placeholder="16. Kat, Mistral"></div>
+      <div class="mfield full"><label>Açıklama</label><textarea id="nport-desc" rows="2"></textarea></div>
+    </div>
+    <div class="mact"><button class="mcancel" onclick="closeMo('mo-port')">İptal</button><button class="msubmit" id="port-submit-btn" onclick="submitPortfolio()">Ekle</button></div>
+  </div>
+</div>
+
+<!-- XML IMPORT -->
+<div class="mo" id="mo-xml">
+  <div class="mbox md">
+    <div class="mtitle">⬆ XML / CSV İçe Aktar</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px">XML veya CSV dosyası yükleyin. İsim ve telefon sütunları otomatik algılanır.</p>
+    <div class="xml-drop" id="xml-drop" onclick="ge('xml-file').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondrop="event.preventDefault();this.classList.remove('drag');xmlFileSelect(event.dataTransfer.files[0])">
+      📂 Sürükleyin veya tıklayın (XML, CSV)
+    </div>
+    <input type="file" id="xml-file" accept=".xml,.csv" style="display:none" onchange="xmlFileSelect(this.files[0])">
+    <div id="xml-preview"></div>
+    <div id="xml-proj-row" style="display:none;margin-top:10px">
+      <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:4px">Proje Ata</label>
+      <div class="ss-wrap">
+        <input class="ss-inp" id="xml-proj-srch" type="text" placeholder="Proje seç..." autocomplete="off"
+          oninput="buildProjSS('xml-proj-dd','xml-proj-id',this.value)" onfocus="buildProjSS('xml-proj-dd','xml-proj-id',this.value)" onblur="setTimeout(()=>closeSS('xml-proj-dd'),150)">
+        <input type="hidden" id="xml-proj-id">
+        <div class="ss-dd" id="xml-proj-dd"></div>
+      </div>
+    </div>
+    <div id="xml-actions" style="display:none" class="mact">
+      <button class="mcancel" onclick="closeMo('mo-xml');xmlReset()">İptal</button>
+      <button class="msubmit-g" onclick="xmlImport()">✓ Listeye Ekle</button>
+    </div>
+  </div>
+</div>
+
+<!-- PDF MODAL -->
+<div class="mo" id="mo-pdf">
+  <div class="mbox sm">
+    <div class="mtitle">📄 PDF Rapor</div>
+    <label class="pdf-opt"><input type="radio" name="ps" value="monthly" checked><div><div class="pdf-ol">Aylık Özet Rapor</div><div class="pdf-os">Danışman & proje bazlı istatistik</div></div></label>
+    <label class="pdf-opt"><input type="radio" name="ps" value="all"><div><div class="pdf-ol">Tüm Müşteri Listesi</div></div></label>
+    <label class="pdf-opt"><input type="radio" name="ps" value="gorusuldu"><div><div class="pdf-ol">Görüşülenler</div></div></label>
+    <label class="pdf-opt"><input type="radio" name="ps" value="bekleyen"><div><div class="pdf-ol">Bekleyenler</div></div></label>
+    <div class="mact"><button class="mcancel" onclick="closeMo('mo-pdf')">İptal</button><button class="msubmit" onclick="generatePdf()">📥 İndir</button></div>
+  </div>
+</div>
+
+<!-- CONFIRM DELETE -->
+<div class="mo" id="mo-del">
+  <div class="mbox sm">
+    <div style="text-align:center;font-size:30px;margin-bottom:7px">🗑️</div>
+    <div style="text-align:center;font-size:14px;font-weight:700;margin-bottom:5px">Bu kaydı sil?</div>
+    <div style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:1.25rem" id="del-name"></div>
+    <div class="mact" style="justify-content:center">
+      <button class="mcancel" onclick="closeMo('mo-del')">İptal</button>
+      <button class="mdanger" onclick="confirmDelete()">Sil</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══ SUPABASE ═══════════════════════════════════
+const SUPA_URL = 'https://ucjkdonarzjaignryeou.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjamtkb25hcnpqYWlnbnJ5ZW91Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0NzUyMzgsImV4cCI6MjA5NjA1MTIzOH0.3PqaalOfvh4bKKhWVflNommmMcZy3O5517SmIR8eiP8';
+const db = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// ═══ STATE ═══════════════════════════════════════
+let CUR = null; // current user profile
+let PROFILES = []; // all profiles
+let PROJECTS = [];
+let PORTFOLIOS = [];
+let CUSTOMERS = []; // single source of truth
+
+let callFilter = 'all';
+let custFilter = 'all';
+let sideFilter = 'all';
+let adminFilter = 'all';
+let pendingDel = null;
+let xmlParsed = [];
+
+// ═══ AUTH ════════════════════════════════════════
+async function doLogin() {
+  const pin = ge('pin-inp').value.trim();
+  if (!pin) return;
+  ge('lload').textContent = 'Kontrol ediliyor...';
+  ge('lerr').textContent = '';
+  const { data, error } = await db.from('profiles').select('*').eq('pin', pin).eq('is_active', true).single();
+  if (error || !data) {
+    ge('lerr').textContent = 'Hatalı PIN.';
+    ge('lload').textContent = '';
+    return;
+  }
+  CUR = data;
+  ge('lload').textContent = '';
+  ge('login-screen').style.display = 'none';
+  ge('loading').style.display = 'flex';
+  await loadAll();
+  ge('loading').style.display = 'none';
+  ge('app').style.display = 'block';
+  ge('user-badge').textContent = CUR.name;
+  ge('role-badge').textContent = CUR.role === 'admin' ? 'Yönetici' : 'Danışman';
+  document.querySelectorAll('.admin-only').forEach(el => el.style.display = CUR.role === 'admin' ? '' : 'none');
+}
+function logout() {
+  CUR = null; PROFILES = []; PROJECTS = []; PORTFOLIOS = []; CUSTOMERS = [];
+  ge('app').style.display = 'none';
+  ge('login-screen').style.display = 'flex';
+  ge('pin-inp').value = ''; ge('lerr').textContent = '';
+}
+
+// ═══ LOAD ALL ════════════════════════════════════
+async function loadAll() {
+  const [p1, p2, p3, p4] = await Promise.all([
+    db.from('profiles').select('*').order('created_at'),
+    db.from('projects').select('*').eq('is_active', true).order('created_at'),
+    db.from('portfolios').select('*').order('created_at'),
+    db.from('customers').select('*').order('created_at'),
+  ]);
+  PROFILES = p1.data || [];
+  PROJECTS = p2.data || [];
+  PORTFOLIOS = p3.data || [];
+  CUSTOMERS = p4.data || [];
+  renderAll();
+}
+
+function renderAll() {
+  updateStats();
+  renderCallList();
+  renderCustomers();
+  renderPortfolios();
+  renderProjects();
+  renderSidebar();
+  updateBadges();
+  checkToday();
+  if (CUR.role === 'admin') renderAdmin();
+}
+
+// ═══ VISIBILITY ══════════════════════════════════
+function canEdit(cust) {
+  if (CUR.role === 'admin') return true;
+  return cust.created_by === CUR.id || cust.assigned_consultant_id === CUR.id;
+}
+function canSeeCustomer(cust) {
+  if (CUR.role === 'admin') return true;
+  return cust.created_by === CUR.id || cust.assigned_consultant_id === CUR.id;
+}
+function canSeePortfolio(port) {
+  if (CUR.role === 'admin') return true;
+  return port.created_by === CUR.id;
+}
+function myCustomers() { return CUSTOMERS.filter(c => canSeeCustomer(c)); }
+
+// ═══ STATS ═══════════════════════════════════════
+function updateStats() {
+  const mine = myCustomers();
+  const bek = mine.filter(c => ['bekleyen','arandi','ulasilamadi','takip'].includes(c.status)).length;
+  const gor = mine.filter(c => c.status === 'gorusuldu').length;
+  ge('st-bek').textContent = bek;
+  ge('st-total').textContent = mine.length;
+  ge('st-gor').textContent = gor;
+  ge('sc-all').textContent = mine.length;
+  ge('sc-bek').textContent = mine.filter(c => ['bekleyen','arandi','ulasilamadi','takip'].includes(c.status)).length;
+  ge('sc-gor').textContent = gor;
+  ge('sc-ula').textContent = mine.filter(c => c.status === 'ulasilamadi').length;
+  ge('sc-tak').textContent = mine.filter(c => c.status === 'takip').length;
+  ge('sc-il').textContent = mine.filter(c => c.interest_status === 'ilgilendi').length;
+  ge('sc-du').textContent = mine.filter(c => c.interest_status === 'dusunuyor').length;
+  ge('sc-ilm').textContent = mine.filter(c => c.interest_status === 'ilgilenmedi').length;
+  ge('cs-tot').textContent = mine.length;
+  ge('cs-gor').textContent = gor;
+  ge('cs-tak').textContent = mine.filter(c => c.status === 'takip').length;
+  ge('cs-ula').textContent = mine.filter(c => c.status === 'ulasilamadi').length;
+  ge('cs-il').textContent = mine.filter(c => c.interest_status === 'ilgilendi').length;
+}
+function updateBadges() {
+  const mine = myCustomers();
+  ge('nb-call').textContent = mine.filter(c => ['bekleyen','arandi','ulasilamadi','takip'].includes(c.status)).length + ' bekliyor';
+  ge('nb-cust').textContent = mine.length;
+  ge('nb-port').textContent = (CUR.role === 'admin' ? PORTFOLIOS : PORTFOLIOS.filter(p => p.created_by === CUR.id)).length;
+  ge('nb-proj').textContent = PROJECTS.length;
+}
+function checkToday() {
+  const today = new Date().toISOString().slice(0, 10);
+  const names = myCustomers().filter(c =>
+    (c.call1_date === today && !c.call1_done) || (c.call2_date === today && !c.call2_done)
+  ).map(c => c.name + (c.call1_date === today && !c.call1_done ? ' (1.Takip)' : ' (2.Takip)'));
+  const bar = ge('today-bar');
+  if (names.length) { bar.style.display = 'flex'; ge('today-names').textContent = names.join(' · '); }
+  else bar.style.display = 'none';
+}
+
+// ═══ SIDEBAR PROJECTS ════════════════════════════
+function renderSidebar() {
+  const mine = myCustomers();
+  ge('sb-proj-list').innerHTML = PROJECTS.map(p => {
+    const cnt = mine.filter(c => c.project_id === p.id).length;
+    return `<button class="sbtn" onclick="setSideFilter('proj:${p.id}',this)">
+      <span class="sb-dot" style="background:${p.color==='inci'?'#1a3c5e':p.color==='atilgan'?'#2e6b3e':'#7a5c99'}"></span>
+      <span style="flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span>
+      <span class="sb-cnt">${cnt}</span>
+    </button>`;
+  }).join('');
+}
+
+// ═══ FILTERS ═════════════════════════════════════
+function setSideFilter(f, btn) {
+  sideFilter = f;
+  document.querySelectorAll('.sbtn').forEach(b => b.classList.remove('on'));
+  if (btn) btn.classList.add('on');
+  renderCallList();
+}
+function setCallFilter(f, fbid) {
+  callFilter = f;
+  document.querySelectorAll('[id^="cf-"]').forEach(b => b.className = 'fbtn');
+  const fb = ge(fbid); if (fb) fb.className = 'fbtn ' + (f === 'gorusuldu' ? 'on-g' : f === 'bekleyen' ? 'on-o' : 'on');
+  renderCallList();
+}
+function setCustFilter(f, fbid) {
+  custFilter = f;
+  document.querySelectorAll('[id^="mf-"]').forEach(b => b.className = 'fbtn');
+  const fb = ge(fbid); if (fb) fb.className = 'fbtn ' + (f === 'gorusuldu' || f === 'ilgilendi' ? 'on-g' : f === 'takip' ? 'on-o' : 'on');
+  renderCustomers();
+}
+
+function filterCustomers(list) {
+  const q = (ge('call-search') || {}).value?.toLowerCase() || '';
+  return list.filter(c => {
+    if (q && !c.name.toLowerCase().includes(q) && !c.phone.toLowerCase().includes(q)) return false;
+    // side filter
+    if (sideFilter === 'bekleyen') return ['bekleyen','arandi','ulasilamadi','takip'].includes(c.status);
+    if (sideFilter === 'gorusuldu') return c.status === 'gorusuldu';
+    if (sideFilter === 'ulasilamadi') return c.status === 'ulasilamadi';
+    if (sideFilter === 'takip') return c.status === 'takip';
+    if (sideFilter === 'ilgilendi') return c.interest_status === 'ilgilendi';
+    if (sideFilter === 'dusunuyor') return c.interest_status === 'dusunuyor';
+    if (sideFilter === 'ilgilenmedi') return c.interest_status === 'ilgilenmedi';
+    if (sideFilter.startsWith('proj:')) return c.project_id === sideFilter.slice(5);
+    return true;
+  });
+}
+
+// ═══ CALL LIST ════════════════════════════════════
+function renderCallList() {
+  updateStats();
+  let list = myCustomers();
+  // call filter
+  if (callFilter === 'bekleyen') list = list.filter(c => ['bekleyen','arandi','ulasilamadi','takip'].includes(c.status));
+  else if (callFilter === 'gorusuldu') list = list.filter(c => c.status === 'gorusuldu');
+  list = filterCustomers(list);
+  const q = (ge('call-search') || {}).value?.toLowerCase() || '';
+  if (q) list = list.filter(c => c.name.toLowerCase().includes(q) || (c.phone||'').toLowerCase().includes(q));
+
+  if (!list.length) { ge('call-list').innerHTML = '<div class="empty">Kayıt yok.</div>'; return; }
+
+  ge('call-list').innerHTML = list.map((c, idx) => buildCustCard(c, idx + 1)).join('');
+}
+
+// ═══ BUILD CUSTOMER CARD ════════════════════════
+function buildCustCard(c, num) {
+  const proj = PROJECTS.find(p => p.id === c.project_id);
+  const port = PORTFOLIOS.find(p => p.id === c.portfolio_id);
+  const consul = PROFILES.find(p => p.id === c.assigned_consultant_id);
+  const editable = canEdit(c);
+  const imap = {ilgilendi:['ib-y','İlgilendi'],dusunuyor:['ib-m','Düşünüyor'],ilgilenmedi:['ib-n','İlgilenmedi']};
+  const smap = {bekleyen:['s-bek','Bekleyen'],arandi:['s-a','Arandı'],gorusuldu:['s-g','Görüşüldü'],ulasilamadi:['s-u','Ulaşılamadı'],takip:['s-t','Takip'],ilgisiz:['s-i','İlgisiz']};
+  const sm = smap[c.status] || ['s-bek','Bekleyen'];
+  const im = c.interest_status ? imap[c.interest_status] : null;
+  const today = new Date().toISOString().slice(0, 10);
+  function tBadge(date, done) {
+    if (!date) return '';
+    if (done) return `<span class="tbadge tb-ok">✓${date}</span>`;
+    if (date < today) return `<span class="tbadge tb-m">⚠${date}</span>`;
+    if (date === today) return `<span class="tbadge" style="background:#fff3cd;color:#856404">⏰Bugün</span>`;
+    return `<span class="tbadge tb-s">${date}</span>`;
+  }
+  const dotClass = {bekleyen:'',arandi:'prog',gorusuldu:'done',ulasilamadi:'done',takip:'warn',ilgisiz:'gray'}[c.status]||'';
+
+  // Danışman dropdown options
+  const danOpts = PROFILES.filter(p => p.role === 'danisan')
+    .map(p => `<option value="${p.id}" ${c.assigned_consultant_id === p.id ? 'selected' : ''}>${p.name}</option>`).join('');
+
+  // Project select options for detail
+  const projOpts = PROJECTS.map(p => `<option value="${p.id}" ${c.project_id === p.id ? 'selected' : ''}>${p.name}</option>`).join('');
+  const portOpts = PORTFOLIOS.filter(p => !c.project_id || p.project_id === c.project_id)
+    .map(p => `<option value="${p.id}" ${c.portfolio_id === p.id ? 'selected' : ''}>${p.title}</option>`).join('');
+
+  return `<div class="cust-card" id="cc-${c.id}">
+    <div class="cust-row" onclick="toggleDetail('${c.id}')">
+      <div class="cust-num">${num}</div>
+      <div class="cust-info">
+        <div class="cust-name">${c.name}</div>
+        <div class="cust-phone">${c.phone || '—'}</div>
+      </div>
+      <div class="cust-tags">
+        <span class="sbadge ${sm[0]}">${sm[1]}</span>
+        ${im ? `<span class="ibadge ${im[0]}">${im[1]}</span>` : ''}
+        ${proj ? `<span style="font-size:10px;color:var(--navy);background:#e8f0f8;padding:1px 6px;border-radius:6px;font-weight:600;white-space:nowrap">${proj.name}</span>` : ''}
+        ${port ? `<span style="font-size:10px;color:var(--purple);background:#f0ecf8;padding:1px 6px;border-radius:6px;font-weight:600;white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis;display:inline-block">${port.title}</span>` : ''}
+        ${tBadge(c.call1_date, c.call1_done)}${tBadge(c.call2_date, c.call2_done)}
+      </div>
+      <div class="cust-right">
+        ${consul ? `<span class="dan-chip">${consul.name.split(' ')[0]}</span>` : ''}
+        ${editable ? `<button class="icon-btn edit" onclick="openCustModal('${c.id}');event.stopPropagation()">✏️</button>` : ''}
+        ${CUR.role === 'admin' ? `<button class="icon-btn" onclick="askDelete('customer','${c.id}','${c.name.replace(/'/g,"\\'")}');event.stopPropagation()">✕</button>` : ''}
+        <div class="cdot ${dotClass}"></div>
+      </div>
+    </div>
+    <div class="cust-detail" id="det-${c.id}">
+      ${editable ? `
+      <div class="dgrid">
+        <div class="dfield"><label>Durum</label>
+          <select id="ds-${c.id}" ${!editable?'disabled':''}>
+            <option value="bekleyen" ${c.status==='bekleyen'?'selected':''}>Bekleyen</option>
+            <option value="arandi" ${c.status==='arandi'?'selected':''}>Arandı</option>
+            <option value="gorusuldu" ${c.status==='gorusuldu'?'selected':''}>Görüşüldü</option>
+            <option value="ulasilamadi" ${c.status==='ulasilamadi'?'selected':''}>Ulaşılamadı</option>
+            <option value="takip" ${c.status==='takip'?'selected':''}>Takip Edilecek</option>
+            <option value="ilgisiz" ${c.status==='ilgisiz'?'selected':''}>İlgisiz</option>
+          </select></div>
+        <div class="dfield"><label>İlgi Durumu</label>
+          <select id="di-${c.id}">
+            <option value="">— Seçiniz —</option>
+            <option value="ilgilendi" ${c.interest_status==='ilgilendi'?'selected':''}>İlgilendi</option>
+            <option value="dusunuyor" ${c.interest_status==='dusunuyor'?'selected':''}>Düşünüyor</option>
+            <option value="ilgilenmedi" ${c.interest_status==='ilgilenmedi'?'selected':''}>İlgilenmedi</option>
+          </select></div>
+        ${CUR.role === 'admin' ? `<div class="dfield"><label>Danışman</label>
+          <select id="dd-${c.id}"><option value="">— Seçiniz —</option>${danOpts}</select></div>` : '<div></div>'}
+        <div class="dfield" style="grid-column:1/-1"><label>Görüşme Notu</label>
+          <textarea id="dn-${c.id}" placeholder="Görüşme nasıl geçti?">${c.notes || ''}</textarea></div>
+      </div>
+      <div class="takip-box">
+        <div class="takip-title">📞 1. Takip Araması</div>
+        <div class="takip-grid">
+          <div class="dfield"><label>Tarih</label><input type="date" id="dt1d-${c.id}" value="${c.call1_date||''}"></div>
+          <div class="dfield"><label>Saat</label><input type="time" id="dt1t-${c.id}" value="${c.call1_time||''}"></div>
+          <div class="dfield"><label>Not</label><input type="text" id="dt1n-${c.id}" value="${c.call1_note||''}" placeholder="Not..."></div>
+        </div>
+        <div class="tdone"><input type="checkbox" id="dt1ok-${c.id}" ${c.call1_done?'checked':''}><label for="dt1ok-${c.id}">1. Takip tamamlandı</label></div>
+      </div>
+      <div class="takip-box">
+        <div class="takip-title">📞 2. Takip Araması</div>
+        <div class="takip-grid">
+          <div class="dfield"><label>Tarih</label><input type="date" id="dt2d-${c.id}" value="${c.call2_date||''}"></div>
+          <div class="dfield"><label>Saat</label><input type="time" id="dt2t-${c.id}" value="${c.call2_time||''}"></div>
+          <div class="dfield"><label>Not</label><input type="text" id="dt2n-${c.id}" value="${c.call2_note||''}" placeholder="Not..."></div>
+        </div>
+        <div class="tdone"><input type="checkbox" id="dt2ok-${c.id}" ${c.call2_done?'checked':''}><label for="dt2ok-${c.id}">2. Takip tamamlandı</label></div>
+      </div>
+      <div class="dactions"><button class="save-btn" onclick="saveCustomerDetail('${c.id}')">Kaydet</button></div>
+      ` : `<div style="padding:8px;font-size:12px;color:var(--muted)">Bu kaydı düzenleme yetkiniz yok.</div>`}
+    </div>
+  </div>`;
+}
+
+function toggleDetail(id) {
+  const det = ge('det-' + id);
+  if (det) det.classList.toggle('open');
+}
+
+// ═══ SAVE CUSTOMER DETAIL ════════════════════════
+async function saveCustomerDetail(id) {
+  const updates = {
+    status: ge('ds-' + id)?.value || 'bekleyen',
+    interest_status: ge('di-' + id)?.value || '',
+    notes: ge('dn-' + id)?.value || '',
+    call1_date: ge('dt1d-' + id)?.value || '',
+    call1_time: ge('dt1t-' + id)?.value || '',
+    call1_note: ge('dt1n-' + id)?.value || '',
+    call1_done: ge('dt1ok-' + id)?.checked || false,
+    call2_date: ge('dt2d-' + id)?.value || '',
+    call2_time: ge('dt2t-' + id)?.value || '',
+    call2_note: ge('dt2n-' + id)?.value || '',
+    call2_done: ge('dt2ok-' + id)?.checked || false,
+    updated_at: new Date().toISOString(),
+  };
+  if (CUR.role === 'admin' && ge('dd-' + id)) {
+    updates.assigned_consultant_id = ge('dd-' + id).value || null;
+  }
+  const { error } = await db.from('customers').update(updates).eq('id', id);
+  if (error) { flash('Hata: ' + error.message, true); return; }
+  const idx = CUSTOMERS.findIndex(c => c.id === id);
+  if (idx >= 0) CUSTOMERS[idx] = { ...CUSTOMERS[idx], ...updates };
+  flash(); renderAll();
+}
+
+// ═══ CUSTOMERS PAGE ═══════════════════════════════
+function renderCustomers() {
+  const q = (ge('cust-search') || {}).value?.toLowerCase() || '';
+  let list = myCustomers();
+  if (custFilter === 'gorusuldu') list = list.filter(c => c.status === 'gorusuldu');
+  else if (custFilter === 'takip') list = list.filter(c => c.status === 'takip');
+  else if (custFilter === 'ilgilendi') list = list.filter(c => c.interest_status === 'ilgilendi');
+  if (q) list = list.filter(c => c.name.toLowerCase().includes(q) || (c.phone||'').toLowerCase().includes(q));
+
+  if (!list.length) { ge('customers-list').innerHTML = '<div class="empty">Müşteri yok.</div>'; updateStats(); return; }
+
+  // group by project
+  const byProj = {};
+  list.forEach(c => {
+    const key = c.project_id || '__none__';
+    (byProj[key] = byProj[key] || []).push(c);
+  });
+
+  const imap = {ilgilendi:'İlgilendi',dusunuyor:'Düşünüyor',ilgilenmedi:'İlgilenmedi'};
+  ge('customers-list').innerHTML = Object.keys(byProj).map(pid => {
+    const proj = PROJECTS.find(p => p.id === pid);
+    const pname = proj ? proj.name : 'Proje Belirsiz';
+    const pcolor = proj ? proj.color : 'other';
+    const rows = byProj[pid];
+    return `<div class="proj-section">
+      <div class="proj-sec-hdr ${pcolor}" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+        <span class="proj-sec-title">${pname}</span>
+        <span class="proj-sec-count">${rows.length} müşteri</span>
+      </div>
+      <table class="vtable"><thead><tr>
+        <th>#</th><th>İsim</th><th>Telefon</th><th>Portföy</th><th>Durum</th><th>İlgi</th><th>Danışman</th><th>1.Takip</th><th>Not</th>
+      </tr></thead><tbody>
+      ${rows.map((c, i) => {
+        const port = PORTFOLIOS.find(p => p.id === c.portfolio_id);
+        const consul = PROFILES.find(p => p.id === c.assigned_consultant_id);
+        const smap = {bekleyen:['s-bek','Bekleyen'],arandi:['s-a','Arandı'],gorusuldu:['s-g','Görüşüldü'],ulasilamadi:['s-u','Ulaşılamadı'],takip:['s-t','Takip'],ilgisiz:['s-i','İlgisiz']};
+        const sm = smap[c.status]||['s-bek','Bekleyen'];
+        return `<tr onclick="goToCustomer('${c.id}')">
+          <td>${i+1}</td><td class="link">${c.name}</td><td>${c.phone||'—'}</td>
+          <td style="font-size:11px;color:var(--purple)">${port?port.title:'—'}</td>
+          <td><span class="sbadge ${sm[0]}">${sm[1]}</span></td>
+          <td style="font-size:11px">${imap[c.interest_status]||'—'}</td>
+          <td style="font-size:11px">${consul?consul.name.split(' ')[0]+' '+consul.name.split(' ').slice(-1)[0]:'—'}</td>
+          <td style="font-size:11px">${c.call1_date?(c.call1_done?'✅ '+c.call1_date:'📅 '+c.call1_date):'—'}</td>
+          <td style="font-size:11px;color:var(--muted)">${c.notes?c.notes.slice(0,28)+(c.notes.length>28?'…':''):'—'}</td>
+        </tr>`;
+      }).join('')}
+      </tbody></table>
+    </div>`;
+  }).join('');
+  updateStats();
+}
+function goToCustomer(id) {
+  switchPage('calllist', document.querySelector('[onclick*="calllist"]'));
+  setCallFilter('all', 'cf-all');
+  setTimeout(() => {
+    const el = ge('cc-' + id);
+    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); ge('det-' + id)?.classList.add('open'); }
+  }, 200);
+}
+
+// ═══ ADD / EDIT CUSTOMER ════════════════════════
+function openCustModal(editId = null) {
+  ge('edit-cust-id').value = editId || '';
+  ge('nc-consultant').innerHTML = '<option value="">— Seçiniz —</option>' +
+    PROFILES.filter(p => p.role === 'danisan').map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+
+  if (editId) {
+    const c = CUSTOMERS.find(x => x.id === editId); if (!c) return;
+    ge('cust-modal-title').textContent = '✏️ Müşteri Düzenle';
+    ge('cust-submit-btn').textContent = 'Güncelle';
+    ge('nc-name').value = c.name; ge('nc-phone').value = c.phone || '';
+    ge('nc-status').value = c.status; ge('nc-interest').value = c.interest_status || '';
+    ge('nc-consultant').value = c.assigned_consultant_id || '';
+    ge('nc-notes').value = c.notes || '';
+    const proj = PROJECTS.find(p => p.id === c.project_id);
+    ge('nc-proj-srch').value = proj ? proj.name : ''; ge('nc-proj-id').value = c.project_id || '';
+    const port = PORTFOLIOS.find(p => p.id === c.portfolio_id);
+    ge('nc-port-srch').value = port ? port.title : ''; ge('nc-port-id').value = c.portfolio_id || '';
+  } else {
+    ge('cust-modal-title').textContent = '➕ Yeni Müşteri Ekle';
+    ge('cust-submit-btn').textContent = 'Ekle';
+    ['nc-name','nc-phone','nc-notes'].forEach(id => ge(id).value = '');
+    ge('nc-status').value = 'bekleyen'; ge('nc-interest').value = '';
+    ge('nc-consultant').value = '';
+    ge('nc-proj-srch').value = ''; ge('nc-proj-id').value = '';
+    ge('nc-port-srch').value = ''; ge('nc-port-id').value = '';
+  }
+  buildProjSS('nc-proj-dd', 'nc-proj-id', '');
+  openMo('mo-cust');
+  setTimeout(() => ge('nc-name').focus(), 80);
+}
+async function submitCustomer() {
+  const name = ge('nc-name').value.trim(); if (!name) { ge('nc-name').focus(); return; }
+  const editId = ge('edit-cust-id').value;
+  const projId = ge('nc-proj-id').value || null;
+  const portId = ge('nc-port-id').value || null;
+  const consultId = ge('nc-consultant').value || CUR.id;
+
+  const payload = {
+    name, phone: ge('nc-phone').value.trim() || '',
+    project_id: projId, portfolio_id: portId,
+    status: ge('nc-status').value || 'bekleyen',
+    interest_status: ge('nc-interest').value || '',
+    assigned_consultant_id: consultId,
+    notes: ge('nc-notes').value.trim(),
+    updated_at: new Date().toISOString(),
+  };
+
+  if (editId) {
+    const { error } = await db.from('customers').update(payload).eq('id', editId);
+    if (error) { flash('Hata: ' + error.message, true); return; }
+    const idx = CUSTOMERS.findIndex(c => c.id === editId);
+    if (idx >= 0) CUSTOMERS[idx] = { ...CUSTOMERS[idx], ...payload };
+    flash('Güncellendi');
+  } else {
+    payload.created_by = CUR.id;
+    const { data, error } = await db.from('customers').insert(payload).select().single();
+    if (error) { flash('Hata: ' + error.message, true); return; }
+    CUSTOMERS.push(data);
+    flash('Müşteri eklendi');
+  }
+  closeMo('mo-cust'); renderAll();
+}
+
+// ═══ PROJECTS ════════════════════════════════════
+function openProjModal(editId = null) {
+  ge('edit-proj-id').value = editId || '';
+  if (editId) {
+    const p = PROJECTS.find(x => x.id === editId); if (!p) return;
+    ge('proj-modal-title').textContent = '✏️ Proje Düzenle'; ge('proj-submit-btn').textContent = 'Güncelle';
+    ge('np-name').value = p.name; ge('np-dev').value = p.developer || '';
+    ge('np-color').value = p.color || 'other'; ge('np-loc').value = p.location || '';
+    ge('np-del').value = p.delivery_date || ''; ge('np-types').value = p.room_types || ''; ge('np-desc').value = p.description || '';
+  } else {
+    ge('proj-modal-title').textContent = '🏢 Yeni Proje Ekle'; ge('proj-submit-btn').textContent = 'Ekle';
+    ['np-name','np-dev','np-loc','np-del','np-types','np-desc'].forEach(id => ge(id).value = '');
+    ge('np-color').value = 'other';
+  }
+  openMo('mo-proj');
+}
+async function submitProject() {
+  const name = ge('np-name').value.trim(); if (!name) return;
+  const editId = ge('edit-proj-id').value;
+  const payload = { name, developer: ge('np-dev').value.trim(), color: ge('np-color').value,
+    location: ge('np-loc').value.trim(), delivery_date: ge('np-del').value.trim(),
+    room_types: ge('np-types').value.trim(), description: ge('np-desc').value.trim(),
+    updated_at: new Date().toISOString() };
+  if (editId) {
+    const { error } = await db.from('projects').update(payload).eq('id', editId);
+    if (error) { flash('Hata', true); return; }
+    const idx = PROJECTS.findIndex(p => p.id === editId);
+    if (idx >= 0) PROJECTS[idx] = { ...PROJECTS[idx], ...payload };
+    flash('Proje güncellendi');
+  } else {
+    payload.created_by = CUR.id;
+    const { data, error } = await db.from('projects').insert(payload).select().single();
+    if (error) { flash('Hata', true); return; }
+    PROJECTS.push(data);
+    flash('Proje eklendi');
+  }
+  closeMo('mo-proj'); renderAll();
+}
+async function addProjPrice(projId) {
+  const l = ge('pl-' + projId).value.trim(), v = ge('pv-' + projId).value.trim(); if (!l || !v) return;
+  const p = PROJECTS.find(x => x.id === projId); if (!p) return;
+  p.prices = [...(p.prices || []), { l, v }];
+  await db.from('projects').update({ prices: p.prices }).eq('id', projId);
+  ge('pl-' + projId).value = ''; ge('pv-' + projId).value = '';
+  flash('Fiyat eklendi'); renderProjects();
+}
+async function delProjPrice(projId, idx) {
+  const p = PROJECTS.find(x => x.id === projId); if (!p) return;
+  p.prices.splice(idx, 1);
+  await db.from('projects').update({ prices: p.prices }).eq('id', projId);
+  flash('Fiyat silindi'); renderProjects();
+}
+async function saveProjNote(projId) {
+  const note = ge('pnote-' + projId).value;
+  await db.from('projects').update({ notes: note }).eq('id', projId);
+  const p = PROJECTS.find(x => x.id === projId); if (p) p.notes = note;
+  flash('Not kaydedildi');
+}
+
+function renderProjects() {
+  const g = ge('proj-grid'); if (!g) return;
+  g.innerHTML = PROJECTS.map(p => {
+    const custInProj = CUSTOMERS.filter(c => c.project_id === p.id && canSeeCustomer(c));
+    const contacted = custInProj.filter(c => c.status !== 'bekleyen');
+    const specsH = [p.location && { l: 'Konum', v: p.location }, p.delivery_date && { l: 'Teslim', v: p.delivery_date }, p.room_types && { l: 'Tipler', v: p.room_types }]
+      .filter(Boolean).map(s => `<div class="pspec"><label>${s.l}</label><div class="sv">${s.v}</div></div>`).join('');
+    const pricesH = (p.prices || []).map((pr, pi) =>
+      `<div class="price-row"><span class="pl">${pr.l}</span><span class="pv">${pr.v}</span>${CUR.role === 'admin' ? `<button class="price-del" onclick="delProjPrice('${p.id}',${pi})">✕</button>` : ''}</div>`
+    ).join('');
+    return `<div class="pcard"><div class="pcard-hdr ${p.color || 'other'}">
+      <div><div class="pcard-name">${p.name}</div>${p.developer ? `<div class="pcard-dev">${p.developer}${p.delivery_date ? ' · ' + p.delivery_date : ''}</div>` : ''}</div>
+      <div class="pcard-act">
+        <button class="p-act-btn" onclick="openProjModal('${p.id}')">✏️</button>
+        <button class="p-act-btn del" onclick="askDelete('project','${p.id}','${p.name}')">🗑</button>
+      </div>
+    </div><div class="pcard-body">
+      ${p.description ? `<p style="font-size:12px;color:var(--muted);margin-bottom:9px">${p.description}</p>` : ''}
+      ${specsH ? `<div class="pspecs">${specsH}</div>` : ''}
+      <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">FİYAT LİSTESİ</div>
+      <div style="margin-bottom:9px">${pricesH || '<div style="font-size:12px;color:var(--muted)">Henüz fiyat eklenmedi.</div>'}</div>
+      ${CUR.role === 'admin' ? `<div class="add-price-row"><input type="text" id="pl-${p.id}" placeholder="Açıklama..."><input type="text" id="pv-${p.id}" placeholder="Fiyat..." style="max-width:130px"><button onclick="addProjPrice('${p.id}')">＋</button></div>` : ''}
+      <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:9px;margin-bottom:5px">EK NOT</div>
+      <textarea class="pnote" id="pnote-${p.id}">${p.notes || ''}</textarea>
+      <button class="psave" onclick="saveProjNote('${p.id}')">Kaydet</button>
+      <div class="proj-cust-box">
+        <div class="proj-cust-title">İletişim Kurulan Müşteriler (${contacted.length})</div>
+        ${contacted.length ? `<table class="vtable"><thead><tr><th>İsim</th><th>Tel</th><th>Portföy</th><th>Durum</th></tr></thead><tbody>
+          ${contacted.slice(0,5).map(c => { const port = PORTFOLIOS.find(po => po.id === c.portfolio_id); const sm = {arandi:['s-a','Arandı'],gorusuldu:['s-g','Görüşüldü'],ulasilamadi:['s-u','Ulaşılamadı'],takip:['s-t','Takip'],ilgisiz:['s-i','İlgisiz']}[c.status]||['s-a','Arandı']; return `<tr><td class="link" onclick="goToCustomer('${c.id}')">${c.name}</td><td>${c.phone||'—'}</td><td style="font-size:11px;color:var(--purple)">${port?port.title:'—'}</td><td><span class="sbadge ${sm[0]}">${sm[1]}</span></td></tr>`; }).join('')}
+          ${contacted.length > 5 ? `<tr><td colspan="4" style="color:var(--muted);font-size:11px">+ ${contacted.length-5} kişi daha</td></tr>` : ''}
+        </tbody></table>` : '<div style="font-size:12px;color:var(--muted);padding:6px">Henüz iletişim kurulmadı.</div>'}
+      </div>
+    </div></div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
