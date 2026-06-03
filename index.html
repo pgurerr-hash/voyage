@@ -295,9 +295,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
       <span class="tb-user" id="user-badge">—</span>
       <span class="tb-role" id="role-badge">—</span>
       <button class="tbtn tbtn-add" onclick="openCustModal()">＋ Müşteri</button>
+      <button class="tbtn" style="background:var(--gold);color:#fff" onclick="openMo('mo-import')">⬆ Dosya Yükle</button>
       <button class="tbtn tbtn-proj admin-only" onclick="openProjModal()">＋ Proje</button>
       <button class="tbtn tbtn-port" onclick="openPortModal()">＋ Portföy</button>
-      <button class="tbtn tbtn-pdf admin-only" onclick="openMo('mo-pdf')">📄 Rapor</button>
+      <button class="tbtn tbtn-pdf admin-only" onclick="openPdfModal()">📄 Rapor</button>
       <button class="tbtn tbtn-out" onclick="logout()">Çıkış</button>
     </div>
   </div>
@@ -497,8 +498,16 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
       <div class="mfield"><label>Daire Tipi</label><input type="text" id="nport-type" placeholder="3+1"></div>
       <div class="mfield"><label>m² Net</label><input type="text" id="nport-net" placeholder="143 m²"></div>
       <div class="mfield"><label>m² Brüt</label><input type="text" id="nport-brut" placeholder="243,1 m²"></div>
-      <div class="mfield"><label>Fiyat</label><input type="text" id="nport-price" placeholder="14.750.000 TL"></div>
-      <div class="mfield"><label>Kat / Cephe</label><input type="text" id="nport-floor" placeholder="16. Kat, Mistral"></div>
+      <div class="mfield full">
+        <label>Fiyat Seçenekleri <button type="button" onclick="addPortOpt('price')" style="background:var(--navy);color:#fff;border:none;border-radius:5px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer;margin-left:6px">＋</button></label>
+        <div id="port-prices-list" style="margin-bottom:5px"></div>
+        <input type="text" id="nport-price-new" placeholder="Fiyat ekle (ör: 14.750.000 TL)" style="width:100%;font-family:var(--font);font-size:12px;border:1px solid var(--border);border-radius:7px;padding:5px 8px;outline:none;background:var(--bg)">
+      </div>
+      <div class="mfield full">
+        <label>Kat / Cephe Seçenekleri <button type="button" onclick="addPortOpt('floor')" style="background:var(--navy);color:#fff;border:none;border-radius:5px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer;margin-left:6px">＋</button></label>
+        <div id="port-floors-list" style="margin-bottom:5px"></div>
+        <input type="text" id="nport-floor-new" placeholder="Kat/cephe ekle (ör: 16. Kat, Mistral)" style="width:100%;font-family:var(--font);font-size:12px;border:1px solid var(--border);border-radius:7px;padding:5px 8px;outline:none;background:var(--bg)">
+      </div>
       <div class="mfield full"><label>Açıklama</label><textarea id="nport-desc" rows="2"></textarea></div>
     </div>
     <div class="mact"><button class="mcancel" onclick="closeMo('mo-port')">İptal</button><button class="msubmit" id="port-submit-btn" onclick="submitPortfolio()">Ekle</button></div>
@@ -539,6 +548,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
     <label class="pdf-opt"><input type="radio" name="ps" value="all"><div><div class="pdf-ol">Tüm Müşteri Listesi</div></div></label>
     <label class="pdf-opt"><input type="radio" name="ps" value="gorusuldu"><div><div class="pdf-ol">Görüşülenler</div></div></label>
     <label class="pdf-opt"><input type="radio" name="ps" value="bekleyen"><div><div class="pdf-ol">Bekleyenler</div></div></label>
+    <label class="pdf-opt"><input type="radio" name="ps" value="portfolios"><div><div class="pdf-ol">Portföy Listesi</div></div></label>
+    <label class="pdf-opt"><input type="radio" name="ps" value="projects"><div><div class="pdf-ol">Proje Listesi</div></div></label>
+    <div style="margin-top:8px">
+      <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:4px">Danışman Filtresi (opsiyonel)</label>
+      <select id="pdf-consultant-filter" style="width:100%;font-family:var(--font);font-size:13px;border:1px solid var(--border);border-radius:8px;padding:7px 10px;background:var(--bg);outline:none">
+        <option value="">Tümü</option>
+      </select>
+    </div>
     <div class="mact"><button class="mcancel" onclick="closeMo('mo-pdf')">İptal</button><button class="msubmit" onclick="generatePdf()">📥 İndir</button></div>
   </div>
 </div>
@@ -575,6 +592,8 @@ let sideFilter = 'all';
 let adminFilter = 'all';
 let pendingDel = null;
 let xmlParsed = [];
+let PROJ_PRICES = [];
+let PORT_OPTIONS = [];
 
 // ═══ AUTH ════════════════════════════════════════
 async function doLogin() {
@@ -608,16 +627,21 @@ function logout() {
 
 // ═══ LOAD ALL ════════════════════════════════════
 async function loadAll() {
-  const [p1, p2, p3, p4] = await Promise.all([
+  const [p1, p2, p3, p4, p5, p6] = await Promise.all([
     db.from('profiles').select('*').order('created_at'),
     db.from('projects').select('*').eq('is_active', true).order('created_at'),
     db.from('portfolios').select('*').order('created_at'),
     db.from('customers').select('*').order('created_at'),
+    db.from('project_price_options').select('*').order('sort_order'),
+    db.from('portfolio_options').select('*').order('created_at'),
   ]);
   PROFILES = p1.data || [];
   PROJECTS = p2.data || [];
   PORTFOLIOS = p3.data || [];
   CUSTOMERS = p4.data || [];
+  PROJ_PRICES = p5.data || [];
+  PORT_OPTIONS = p6.data || [];
+  await loadGroupOverrides();
   renderAll();
 }
 
@@ -737,20 +761,72 @@ function filterCustomers(list) {
   });
 }
 
-// ═══ CALL LIST ════════════════════════════════════
+// ═══ CALL LIST — 5'li gruplar ══════════════════════
+const DEFAULT_GROUP_CONSULTANTS = {
+  0:'Şehmus Emre Kavak',1:'Olcay Kart',2:'Olcay Kart',
+  3:'Olcay Kart',4:'Şehmus Emre Kavak',5:'Şehmus Emre Kavak'
+};
+let GROUP_OVERRIDES = {};
+async function loadGroupOverrides() {
+  try {
+    const {data} = await db.from('group_overrides').select('*');
+    if (data) data.forEach(r => { GROUP_OVERRIDES[r.group_idx] = r.consultant_name; });
+  } catch(e) {}
+}
+async function saveGroupOverride(groupIdx, name) {
+  GROUP_OVERRIDES[groupIdx] = name;
+  try {
+    await db.from('group_overrides').upsert({group_idx:groupIdx, consultant_name:name},{onConflict:'group_idx'});
+  } catch(e) { GROUP_OVERRIDES[groupIdx] = name; }
+}
+function getGroupConsultant(g) {
+  return GROUP_OVERRIDES[g] !== undefined ? GROUP_OVERRIDES[g] : (DEFAULT_GROUP_CONSULTANTS[g]||'');
+}
 function renderCallList() {
   updateStats();
   let list = myCustomers();
-  // call filter
   if (callFilter === 'bekleyen') list = list.filter(c => ['bekleyen','arandi','ulasilamadi','takip'].includes(c.status));
   else if (callFilter === 'gorusuldu') list = list.filter(c => c.status === 'gorusuldu');
   list = filterCustomers(list);
-  const q = (ge('call-search') || {}).value?.toLowerCase() || '';
-  if (q) list = list.filter(c => c.name.toLowerCase().includes(q) || (c.phone||'').toLowerCase().includes(q));
-
+  const q = (ge('call-search')||{}).value?.toLowerCase()||'';
+  if (q) list = list.filter(c => c.name.toLowerCase().includes(q)||(c.phone||'').toLowerCase().includes(q));
   if (!list.length) { ge('call-list').innerHTML = '<div class="empty">Kayıt yok.</div>'; return; }
 
-  ge('call-list').innerHTML = list.map((c, idx) => buildCustCard(c, idx + 1)).join('');
+  const BATCH = 5;
+  const groups = {};
+  list.forEach((c,idx) => {
+    const g = (c.batch_group !== undefined && c.batch_group !== null) ? Number(c.batch_group) : Math.floor(idx/BATCH);
+    (groups[g]=groups[g]||[]).push({c, num:idx+1});
+  });
+
+  const isAdmin = CUR.role === 'admin';
+  let out = '';
+  Object.keys(groups).sort((a,b)=>Number(a)-Number(b)).forEach(g => {
+    const gn = Number(g);
+    const members = groups[g];
+    const consultant = getGroupConsultant(gn);
+    const done = members.filter(({c}) => ['gorusuldu','ulasilamadi'].includes(c.status)).length;
+    const pct = Math.round(done/members.length*100);
+    const fp = members[0]?.c?.form||'diger';
+    const pLabel = fp==='inci'?'İnci Mega':fp==='atilgan'?'Atılgan Oasis':'Diğer';
+    const hColor = fp==='inci'?'var(--navy)':fp==='atilgan'?'var(--green)':'var(--purple)';
+    const danOpts = PROFILES.filter(p=>p.role==='danisan').map(p=>`<option value="${p.name}" ${consultant===p.name?'selected':''}>${p.name}</option>`).join('');
+    out += `<div style="margin-bottom:1rem;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.07)">
+      <div style="background:${hColor};padding:9px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="document.getElementById('gc${gn}').style.display=document.getElementById('gc${gn}').style.display==='none'?'block':'none'">
+        <div style="display:flex;align-items:center;gap:9px;color:#fff">
+          <span style="font-size:13px;font-weight:700">Grup ${gn+1} — ${pLabel}</span>
+          <div style="width:55px;height:4px;background:rgba(255,255,255,.25);border-radius:10px;overflow:hidden"><div style="height:100%;width:${pct}%;background:rgba(255,255,255,.85)"></div></div>
+          <span style="font-size:10px;opacity:.75">${done}/${members.length}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px" onclick="event.stopPropagation()">
+          ${isAdmin ? `<select onchange="saveGroupOverride(${gn},this.value)" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:6px;color:#fff;font-family:var(--font);font-size:11px;padding:3px 7px;outline:none"><option value="">Danışman seç...</option>${danOpts}</select>` : `<span style="font-size:11px;color:rgba(255,255,255,.85);background:rgba(255,255,255,.15);padding:2px 9px;border-radius:10px">${consultant||'—'}</span>`}
+          <span style="color:rgba(255,255,255,.65);font-size:15px">▾</span>
+        </div>
+      </div>
+      <div id="gc${gn}" style="background:var(--card)">${members.map(({c,num})=>buildCustCard(c,num)).join('')}</div>
+    </div>`;
+  });
+  ge('call-list').innerHTML = out;
 }
 
 // ═══ BUILD CUSTOMER CARD ════════════════════════
@@ -1062,17 +1138,26 @@ async function submitProject() {
   closeMo('mo-proj'); renderAll();
 }
 async function addProjPrice(projId) {
-  const l = ge('pl-' + projId).value.trim(), v = ge('pv-' + projId).value.trim(); if (!l || !v) return;
-  const p = PROJECTS.find(x => x.id === projId); if (!p) return;
-  p.prices = [...(p.prices || []), { l, v }];
-  await db.from('projects').update({ prices: p.prices }).eq('id', projId);
-  ge('pl-' + projId).value = ''; ge('pv-' + projId).value = '';
+  const title = ge('pl-'+projId)?.value.trim();
+  const price = ge('pv-'+projId)?.value.trim();
+  const floor = ge('pfl-'+projId)?.value.trim()||'';
+  const sqm = ge('psqm-'+projId)?.value.trim()||'';
+  if (!price) return;
+  const {data, error} = await db.from('project_price_options').insert({
+    project_id: projId, title: title||'', price, floor_info: floor, square_meter: sqm,
+    sort_order: PROJ_PRICES.filter(x=>x.project_id===projId).length
+  }).select().single();
+  if (error) { flash('Hata: '+error.message, true); return; }
+  PROJ_PRICES.push(data);
+  if(ge('pl-'+projId)) ge('pl-'+projId).value='';
+  if(ge('pv-'+projId)) ge('pv-'+projId).value='';
+  if(ge('pfl-'+projId)) ge('pfl-'+projId).value='';
+  if(ge('psqm-'+projId)) ge('psqm-'+projId).value='';
   flash('Fiyat eklendi'); renderProjects();
 }
-async function delProjPrice(projId, idx) {
-  const p = PROJECTS.find(x => x.id === projId); if (!p) return;
-  p.prices.splice(idx, 1);
-  await db.from('projects').update({ prices: p.prices }).eq('id', projId);
+async function delProjPriceOpt(optId) {
+  await db.from('project_price_options').delete().eq('id', optId);
+  PROJ_PRICES = PROJ_PRICES.filter(x => x.id !== optId);
   flash('Fiyat silindi'); renderProjects();
 }
 async function saveProjNote(projId) {
@@ -1089,13 +1174,19 @@ function renderProjects() {
     const contacted = custInProj.filter(c => c.status !== 'bekleyen');
     const specsH = [p.location && { l: 'Konum', v: p.location }, p.delivery_date && { l: 'Teslim', v: p.delivery_date }, p.room_types && { l: 'Tipler', v: p.room_types }]
       .filter(Boolean).map(s => `<div class="pspec"><label>${s.l}</label><div class="sv">${s.v}</div></div>`).join('');
-    const pricesH = (p.prices || []).map((pr, pi) =>
-      `<div class="price-row"><span class="pl">${pr.l}</span><span class="pv">${pr.v}</span>${CUR.role === 'admin' ? `<button class="price-del" onclick="delProjPrice('${p.id}',${pi})">✕</button>` : ''}</div>`
+    const projPrices = PROJ_PRICES.filter(pp => pp.project_id === p.id);
+    const pricesH = projPrices.map(pp =>
+      `<div class="price-row">
+        <span class="pl">${[pp.floor_info, pp.facade, pp.square_meter, pp.title].filter(Boolean).join(' · ')}</span>
+        <span class="pv">${pp.price}</span>
+        ${CUR.role === 'admin' ? `<button class="price-del" onclick="delProjPriceOpt('${pp.id}')">✕</button>` : ''}
+      </div>`
     ).join('');
     return `<div class="pcard"><div class="pcard-hdr ${p.color || 'other'}">
       <div onclick="showProjDetail('${p.id}')" style="cursor:pointer;flex:1"><div class="pcard-name" style="text-decoration:underline;text-decoration-color:rgba(255,255,255,.4)">${p.name}</div>${p.developer ? `<div class="pcard-dev">${p.developer}${p.delivery_date ? ' · ' + p.delivery_date : ''}</div>` : ''}</div>
       <div class="pcard-act">
         <button class="p-act-btn" onclick="openProjModal('${p.id}')">✏️</button>
+        <button class="p-act-btn" onclick="pdfByProject('${p.id}','${p.name}')">📄</button>
         <button class="p-act-btn del" onclick="askDelete('project','${p.id}','${p.name}')">🗑</button>
       </div>
     </div><div class="pcard-body">
@@ -1103,7 +1194,13 @@ function renderProjects() {
       ${specsH ? `<div class="pspecs">${specsH}</div>` : ''}
       <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">FİYAT LİSTESİ</div>
       <div style="margin-bottom:9px">${pricesH || '<div style="font-size:12px;color:var(--muted)">Henüz fiyat eklenmedi.</div>'}</div>
-      ${CUR.role === 'admin' ? `<div class="add-price-row"><input type="text" id="pl-${p.id}" placeholder="Açıklama..."><input type="text" id="pv-${p.id}" placeholder="Fiyat..." style="max-width:130px"><button onclick="addProjPrice('${p.id}')">＋</button></div>` : ''}
+      ${CUR.role === 'admin' ? `<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:6px;margin-top:6px">
+        <input type="text" id="pl-${p.id}" placeholder="Açıklama..." style="font-family:var(--font);font-size:12px;border:1px solid var(--border);border-radius:7px;padding:5px 8px;outline:none;background:var(--bg)">
+        <input type="text" id="pfl-${p.id}" placeholder="Kat..." style="font-family:var(--font);font-size:12px;border:1px solid var(--border);border-radius:7px;padding:5px 8px;outline:none;background:var(--bg)">
+        <input type="text" id="psqm-${p.id}" placeholder="m²..." style="font-family:var(--font);font-size:12px;border:1px solid var(--border);border-radius:7px;padding:5px 8px;outline:none;background:var(--bg)">
+        <input type="text" id="pv-${p.id}" placeholder="Fiyat (TL) *" style="font-family:var(--font);font-size:12px;border:1px solid var(--border);border-radius:7px;padding:5px 8px;outline:none;background:var(--bg)">
+        <button onclick="addProjPrice('${p.id}')" style="background:var(--navy);color:#fff;border:none;border-radius:7px;padding:5px 10px;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">＋ Ekle</button>
+      </div>` : ''}
       <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:9px;margin-bottom:5px">EK NOT</div>
       <textarea class="pnote" id="pnote-${p.id}">${p.notes || ''}</textarea>
       <button class="psave" onclick="saveProjNote('${p.id}')">Kaydet</button>
@@ -1121,7 +1218,14 @@ function renderProjects() {
 // ═══ PORTFOLIOS ══════════════════════════════════════════
 function openPortModal(editId = null) {
   ge('edit-port-id').value = editId || '';
+  resetPortOpts();
   if (editId) {
+    // Load existing options
+    const existingPrices = PORT_OPTIONS.filter(o => o.portfolio_id === editId && o.price);
+    const existingFloors = PORT_OPTIONS.filter(o => o.portfolio_id === editId && o.floor_info);
+    pendingPortOpts.prices = existingPrices.map(o => o.price).filter(Boolean);
+    pendingPortOpts.floors = existingFloors.map(o => o.floor_info).filter(Boolean);
+    renderPortOptList('price'); renderPortOptList('floor');
     const p = PORTFOLIOS.find(x => x.id === editId); if (!p) return;
     ge('port-modal-title').textContent = '✏️ Portföy Düzenle'; ge('port-submit-btn').textContent = 'Güncelle';
     ge('nport-name').value = p.title; ge('nport-type').value = p.room_type || '';
@@ -1158,6 +1262,22 @@ async function submitPortfolio() {
     PORTFOLIOS.push(data);
     flash('Portföy eklendi');
   }
+  // Save portfolio options
+  if (data && data.id) {
+    const portId = data.id;
+    // Delete old options then insert new
+    await db.from('portfolio_options').delete().eq('portfolio_id', portId);
+    const optRows = [
+      ...pendingPortOpts.prices.map(p => ({portfolio_id:portId, price:p})),
+      ...pendingPortOpts.floors.map(f => ({portfolio_id:portId, floor_info:f})),
+    ];
+    if (optRows.length) {
+      const {data:od} = await db.from('portfolio_options').insert(optRows).select();
+      PORT_OPTIONS = PORT_OPTIONS.filter(o => o.portfolio_id !== portId);
+      PORT_OPTIONS.push(...(od||[]));
+    }
+    resetPortOpts();
+  }
   closeMo('mo-port'); renderAll();
 }
 async function savePortNote(pid) {
@@ -1179,6 +1299,7 @@ function renderPortfolios() {
         <div class="portcard-name" onclick="showPortDetail('${p.id}')">${p.title}</div>
         <div class="portcard-acts">
           <button class="port-act" onclick="openPortModal('${p.id}')">✏️</button>
+          <button class="port-act" onclick="pdfByPortfolio('${p.id}','${p.title.replace(/'/g,'\'')}')" title="PDF İndir">📄</button>
           <button class="port-act del" onclick="askDelete('portfolio','${p.id}','${p.title.replace(/'/g,"\'")}')">🗑</button>
         </div>
       </div>
@@ -1423,71 +1544,240 @@ async function xmlImport() {
 }
 
 // ═══ PDF ═══════════════════════════════════════════════════
+
+// ═══ PDF HELPERS ════════════════════════════════════════
+function pdfInit() {
+  const {jsPDF} = window.jspdf;
+  const doc = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  return doc;
+}
+// Türkçe karakter dönüşümü
+function tr(s) {
+  if (!s) return '';
+  return String(s)
+    .replace(/ş/g,'s').replace(/Ş/g,'S')
+    .replace(/ğ/g,'g').replace(/Ğ/g,'G')
+    .replace(/ü/g,'u').replace(/Ü/g,'U')
+    .replace(/ö/g,'o').replace(/Ö/g,'O')
+    .replace(/ç/g,'c').replace(/Ç/g,'C')
+    .replace(/ı/g,'i').replace(/İ/g,'I');
+}
+function pdfHeader(doc, title, subtitle) {
+  const N=[26,60,94],O=[232,81,26];
+  const pw=210, M=14;
+  doc.setFillColor(...N);doc.rect(0,0,pw,22,'F');
+  doc.setFontSize(13);doc.setFont('helvetica','bold');doc.setTextColor(255,255,255);
+  doc.text(tr('Voyage Gayrimenkul'),M,10);
+  doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(200,220,240);
+  doc.text(tr(title)+' · '+new Date().toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric'}),M,16);
+  if (subtitle) {
+    doc.setFontSize(7);doc.setTextColor(180,200,220);
+    doc.text(tr(subtitle),210-M,16,{align:'right'});
+  }
+  return 28;
+}
+function pdfFooter(doc, page) {
+  const pw=210,ph=297,M=14;
+  doc.setFillColor(26,60,94);doc.rect(0,ph-8,pw,8,'F');
+  doc.setFontSize(7);doc.setFont('helvetica','normal');doc.setTextColor(180,200,220);
+  doc.text('Voyage Gayrimenkul',M,ph-3);
+  doc.text('Sayfa '+page,pw-M,ph-3,{align:'right'});
+}
+function pdfNewPage(doc, pageRef) {
+  doc.addPage(); pageRef.n++; 
+  pdfFooter(doc, pageRef.n);
+  return 16;
+}
+function pdfCustTable(doc, customers, y, pageRef) {
+  const pw=210, M=14, IW=pw-M*2;
+  const B=[221,227,234], L=[240,245,250];
+  const sMap={bekleyen:'Bekleyen',arandi:'Arandi',gorusuldu:'Goruldu',ulasilamadi:'Ulasilamadi',takip:'Takip',ilgisiz:'Ilgisiz'};
+  
+  // Header row
+  doc.setFillColor(26,60,94);doc.rect(M,y,IW,8,'F');
+  doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(255,255,255);
+  doc.text('#',M+2,y+5.5);
+  doc.text('ISIM',M+8,y+5.5);
+  doc.text('TEL',M+62,y+5.5);
+  doc.text('PROJE',M+98,y+5.5);
+  doc.text('DANISМАН',M+128,y+5.5);
+  doc.text('DURUM',M+158,y+5.5);
+  y += 9;
+
+  customers.forEach((c, i) => {
+    if (y + 12 > 287) { y = pdfNewPage(doc, pageRef); }
+    const proj = PROJECTS.find(p=>p.id===c.project_id);
+    const consul = PROFILES.find(p=>p.id===c.assigned_consultant_id);
+    doc.setFillColor(...(i%2===0?L:[255,255,255]));
+    doc.rect(M,y,IW,10,'F');
+    doc.setDrawColor(...B);doc.setLineWidth(.2);doc.rect(M,y,IW,10,'S');
+    doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(26,60,94);
+    doc.text(String(i+1),M+2,y+7);
+    doc.setFont('helvetica','normal');doc.setTextColor(30,40,50);
+    doc.text(tr(c.name||'').slice(0,26),M+8,y+7);
+    doc.setTextColor(100,120,140);
+    doc.text(tr(c.phone||'—').slice(0,18),M+62,y+7);
+    doc.text(tr(proj?proj.name:'—').slice(0,16),M+98,y+7);
+    doc.text(tr(consul?consul.name.split(' ')[0]:'—').slice(0,14),M+128,y+7);
+    const st=sMap[c.status]||c.status||'';
+    doc.text(tr(st).slice(0,14),M+158,y+7);
+    // Note on second line if exists
+    if (c.notes && c.notes.trim()) {
+      y += 10;
+      if (y + 6 > 287) { y = pdfNewPage(doc, pageRef); }
+      doc.setFillColor(...(i%2===0?L:[255,255,255]));
+      doc.rect(M,y,IW,6,'F');
+      doc.setFontSize(6.5);doc.setFont('helvetica','italic');doc.setTextColor(120,140,160);
+      doc.text('  '+tr(c.notes||'').slice(0,80)+(c.notes.length>80?'...':''),M+8,y+4.5);
+      y += 6;
+    } else {
+      y += 10;
+    }
+  });
+  return y;
+}
+
 function generatePdf() {
   const scope = document.querySelector('input[name="ps"]:checked').value;
+  const consultantId = ge('pdf-consultant-filter')?.value || '';
   closeMo('mo-pdf');
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
-  const N=[26,60,94],O=[232,81,26],G=[46,107,62],L=[240,245,250],B=[221,227,234];
-  const pw=210,ph=297,M=14,IW=pw-M*2;
-  let y=16, pn=1;
-  const nPage=()=>{doc.addPage();y=16;pn++;doc.setFillColor(...N);doc.rect(0,0,pw,10,'F');doc.setFontSize(7);doc.setTextColor(255,255,255);doc.text('Voyage Gayrimenkul',M,6.5);doc.text('Sayfa '+pn,pw-M,6.5,{align:'right'});y=16;};
-  doc.setFillColor(...N);doc.rect(0,0,pw,22,'F');
-  doc.setFontSize(14);doc.setFont('helvetica','bold');doc.setTextColor(255,255,255);doc.text('Voyage Gayrimenkul',M,10);
-  doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(200,220,240);
-  const lbl={monthly:'Aylık Özet',all:'Tüm Müşteriler',gorusuldu:'Görüşülenler',bekleyen:'Bekleyenler'}[scope]||'Rapor';
-  doc.text(lbl+' · '+new Date().toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric'}),M,16);
-  y=28;
-  const mine = myCustomers();
+  
+  const doc = pdfInit();
+  const pageRef = {n:1};
+  let y = 16;
+  
+  const titleMap = {
+    monthly:'Aylik Ozet Raporu', all:'Tum Musteri Listesi',
+    gorusuldu:'Gorusulenler', bekleyen:'Bekleyenler',
+    portfolios:'Portfoy Listesi', projects:'Proje Listesi'
+  };
+  
+  const filterLabel = consultantId ? 
+    (PROFILES.find(p=>p.id===consultantId)?.name||'') : '';
+
+  pdfFooter(doc, 1);
+  
+  let mine = myCustomers();
+  if (consultantId) mine = mine.filter(c => c.assigned_consultant_id === consultantId);
+  
   if (scope === 'monthly') {
+    y = pdfHeader(doc, 'Aylik Ozet', filterLabel||CUR.name);
     const thisMonth = new Date().toISOString().slice(0,7);
     const addedThisMonth = mine.filter(c=>c.created_at&&c.created_at.startsWith(thisMonth)).length;
     const gor = mine.filter(c=>c.status==='gorusuldu').length;
     const bek = mine.filter(c=>['bekleyen','arandi','ulasilamadi','takip'].includes(c.status)).length;
-    doc.setFillColor(...L);doc.rect(M,y,IW,36,'F');doc.setDrawColor(...B);doc.setLineWidth(.3);doc.rect(M,y,IW,36,'S');
+    
+    const N=[26,60,94], L=[240,245,250], B=[221,227,234];
+    const pw=210, M=14, IW=pw-M*2;
+    
+    // Summary box
+    doc.setFillColor(...L);doc.rect(M,y,IW,40,'F');
+    doc.setDrawColor(...B);doc.setLineWidth(.3);doc.rect(M,y,IW,40,'S');
     doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(...N);
-    doc.text('AYLIK ÖZET — '+new Date().toLocaleDateString('tr-TR',{month:'long',year:'numeric'}).toUpperCase(),M+4,y+7);
+    doc.text(tr('AYLIK OZET - ')+new Date().toLocaleDateString('tr-TR',{month:'long',year:'numeric'}).toUpperCase(),M+4,y+8);
     doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(60,60,80);
-    doc.text('Bu ay eklenen: '+addedThisMonth,M+4,y+15);doc.text('Görüşüldü: '+gor,M+4,y+22);doc.text('Bekliyor: '+bek,M+4,y+29);
-    doc.text('Toplam: '+mine.length,M+70,y+15);doc.text('Portföy: '+PORTFOLIOS.length,M+70,y+22);doc.text('Proje: '+PROJECTS.length,M+70,y+29);
-    y+=42;
-    doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(...N);doc.text('DANIŞMAN BAZLI',M,y);y+=6;
+    doc.text('Bu ay eklenen: '+addedThisMonth,M+4,y+17);
+    doc.text(tr('Gorusuldu: ')+gor,M+4,y+24);
+    doc.text('Bekliyor: '+bek,M+4,y+31);
+    doc.text('Toplam musteri: '+mine.length,M+75,y+17);
+    doc.text(tr('Portfoy sayisi: ')+PORTFOLIOS.length,M+75,y+24);
+    doc.text('Proje sayisi: '+PROJECTS.length,M+75,y+31);
+    y += 46;
+    
+    // By consultant
+    doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(...N);
+    doc.text(tr('DANISМАН BAZLI'),M,y);y+=7;
     PROFILES.filter(p=>p.role==='danisan').forEach(d=>{
       const cnt=mine.filter(c=>c.assigned_consultant_id===d.id).length;
       const dG=mine.filter(c=>c.assigned_consultant_id===d.id&&c.status==='gorusuldu').length;
       doc.setFillColor(248,250,252);doc.rect(M,y,IW,10,'F');doc.setDrawColor(...B);doc.setLineWidth(.2);doc.rect(M,y,IW,10,'S');
-      doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(...N);doc.text(d.name,M+4,y+7);
-      doc.setFont('helvetica','normal');doc.setTextColor(80,80,100);doc.text('Toplam: '+cnt+' · Görüşüldü: '+dG,M+80,y+7);
+      doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(...N);doc.text(tr(d.name),M+4,y+7);
+      doc.setFont('helvetica','normal');doc.setTextColor(80,80,100);
+      doc.text('Toplam: '+cnt+tr(' · Goruldu: ')+dG,M+80,y+7);
       y+=12;
+    });
+    y += 4;
+    
+    // By project
+    doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(...N);
+    doc.text(tr('PROJE BAZLI DAGILIM'),M,y);y+=7;
+    PROJECTS.forEach(p=>{
+      const cnt=mine.filter(c=>c.project_id===p.id).length;
+      const pG=mine.filter(c=>c.project_id===p.id&&c.status==='gorusuldu').length;
+      doc.setFillColor(248,250,252);doc.rect(M,y,IW,10,'F');doc.setDrawColor(...B);doc.setLineWidth(.2);doc.rect(M,y,IW,10,'S');
+      doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(...N);doc.text(tr(p.name),M+4,y+7);
+      doc.setFont('helvetica','normal');doc.setTextColor(80,80,100);
+      doc.text(cnt+tr(' musteri · Goruldu: ')+pG,M+80,y+7);
+      y+=12;
+    });
+  } else if (scope === 'portfolios') {
+    y = pdfHeader(doc, tr('Portfoy Listesi'), filterLabel);
+    const pw=210, M=14, IW=pw-M*2;
+    const B=[221,227,234], L=[240,245,250];
+    PORTFOLIOS.forEach((p, i) => {
+      if (y + 18 > 287) { y = pdfNewPage(doc, pageRef); }
+      const proj = PROJECTS.find(pr=>pr.id===p.project_id);
+      const portCusts = mine.filter(c=>c.portfolio_id===p.id);
+      doc.setFillColor(...(i%2===0?L:[255,255,255]));doc.rect(M,y,IW,16,'F');
+      doc.setDrawColor(...B);doc.setLineWidth(.2);doc.rect(M,y,IW,16,'S');
+      doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(26,60,94);
+      doc.text(tr(p.title||'').slice(0,40),M+4,y+7);
+      doc.setFontSize(7.5);doc.setFont('helvetica','normal');doc.setTextColor(100,120,140);
+      doc.text(tr(proj?proj.name:'—'),M+4,y+13);
+      doc.text([p.room_type,p.square_meter_net,p.price].filter(Boolean).map(tr).join(' · ').slice(0,40),M+50,y+13);
+      doc.text(tr('Musteri: ')+portCusts.length,M+150,y+10);
+      y += 17;
+    });
+  } else if (scope === 'projects') {
+    y = pdfHeader(doc, 'Proje Listesi', filterLabel);
+    const pw=210, M=14, IW=pw-M*2;
+    const B=[221,227,234], L=[240,245,250];
+    PROJECTS.forEach((p, i) => {
+      if (y + 22 > 287) { y = pdfNewPage(doc, pageRef); }
+      const projCusts = mine.filter(c=>c.project_id===p.id);
+      doc.setFillColor(...(i%2===0?L:[255,255,255]));doc.rect(M,y,IW,20,'F');
+      doc.setDrawColor(...B);doc.setLineWidth(.2);doc.rect(M,y,IW,20,'S');
+      doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(26,60,94);
+      doc.text(tr(p.name||'').slice(0,30),M+4,y+8);
+      doc.setFontSize(7.5);doc.setFont('helvetica','normal');doc.setTextColor(100,120,140);
+      if (p.developer) doc.text(tr(p.developer),M+4,y+14);
+      if (p.location) doc.text(tr(p.location),M+60,y+14);
+      doc.text(tr('Musteri: ')+projCusts.length+tr(' | Goruldu: ')+projCusts.filter(c=>c.status==='gorusuldu').length,M+140,y+14);
+      y += 21;
     });
   } else {
     let list = mine;
     if (scope==='gorusuldu') list=list.filter(c=>c.status==='gorusuldu');
     else if (scope==='bekleyen') list=list.filter(c=>['bekleyen','arandi','ulasilamadi','takip'].includes(c.status));
-    doc.setFillColor(...L);doc.rect(M,y,IW,12,'F');doc.setDrawColor(...B);doc.setLineWidth(.3);doc.rect(M,y,IW,12,'S');
-    doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(...N);
-    doc.text('Toplam: '+list.length,M+4,y+8);doc.text(CUR.name,pw-M-4,y+8,{align:'right'});
-    y+=18;
-    const sL={bekleyen:'Bekleyen',arandi:'Arandı',gorusuldu:'Görüşüldü',ulasilamadi:'Ulaşılamadı',takip:'Takip',ilgisiz:'İlgisiz'};
-    list.forEach((c,i)=>{
-      if(y+20>ph-14)nPage();
-      const proj=PROJECTS.find(p=>p.id===c.project_id);
-      const consul=PROFILES.find(p=>p.id===c.assigned_consultant_id);
-      doc.setFillColor(...(i%2===0?L:[255,255,255]));doc.rect(M,y,IW,18,'F');doc.setDrawColor(...B);doc.setLineWidth(.2);doc.rect(M,y,IW,18,'S');
-      doc.setFillColor(...O);doc.rect(M,y,8,18,'F');doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(255,255,255);doc.text(String(i+1),M+4,y+11,{align:'center'});
-      doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(...N);doc.text(c.name.slice(0,28),M+11,y+7);
-      doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(100,120,140);doc.text(c.phone||'—',M+11,y+13);
-      if(proj){doc.setFontSize(7);doc.setTextColor(...N);doc.text(proj.name.slice(0,20),M+80,y+7);}
-      if(consul){doc.setFontSize(7);doc.text(consul.name.split(' ')[0],M+80,y+13);}
-      doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(80,80,100);doc.text(sL[c.status]||c.status,M+140,y+7);
-      y+=19;
-    });
+    
+    const subtitle = (filterLabel ? filterLabel+' — ':'')+list.length+' kayit';
+    y = pdfHeader(doc, tr(titleMap[scope]||'Liste'), subtitle);
+    y = pdfCustTable(doc, list, y, pageRef);
   }
-  doc.setFillColor(...N);doc.rect(0,ph-8,pw,8,'F');
-  doc.setFontSize(7);doc.setFont('helvetica','normal');doc.setTextColor(180,200,220);
-  doc.text('Voyage Gayrimenkul · voyagestate.com',M,ph-3);doc.text(new Date().toLocaleDateString('tr-TR'),pw-M,ph-3,{align:'right'});
-  doc.save('voyage-rapor-'+new Date().toISOString().slice(0,10)+'.pdf');
+  
+  doc.save('voyage-'+scope+'-'+new Date().toISOString().slice(0,10)+'.pdf');
 }
+
+function pdfByProject(projId, projName) {
+  const list = myCustomers().filter(c => c.project_id === projId);
+  const doc = pdfInit();
+  const pageRef = {n:1};
+  pdfFooter(doc, 1);
+  let y = pdfHeader(doc, tr(projName)+' - Musteri Listesi', list.length+' kayit');
+  pdfCustTable(doc, list, y, pageRef);
+  doc.save('voyage-proje-'+tr(projName).replace(/\s/g,'-')+'-'+new Date().toISOString().slice(0,10)+'.pdf');
+}
+
+function pdfByPortfolio(portId, portName) {
+  const list = myCustomers().filter(c => c.portfolio_id === portId);
+  const doc = pdfInit();
+  const pageRef = {n:1};
+  pdfFooter(doc, 1);
+  let y = pdfHeader(doc, tr(portName)+' - Musteri Listesi', list.length+' kayit');
+  pdfCustTable(doc, list, y, pageRef);
+  doc.save('voyage-portfoy-'+tr(portName).replace(/\s/g,'-')+'-'+new Date().toISOString().slice(0,10)+'.pdf');
+}
+
 
 
 // ═══ PROJECT DETAIL MODAL ══════════════════════════════════
@@ -1546,6 +1836,229 @@ function editFromDetail() {
   if (detailProjId) openProjModal(detailProjId);
 }
 
+
+// ═══ FILE IMPORT ════════════════════════════════════════
+let importData = [];
+
+function importFileSelect(file) {
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'csv') {
+    const reader = new FileReader();
+    reader.onload = e => parseImportCSV(e.target.result);
+    reader.readAsText(file, 'UTF-8');
+  } else if (ext === 'xlsx' || ext === 'xls') {
+    const reader = new FileReader();
+    reader.onload = e => parseImportExcel(e.target.result);
+    reader.readAsArrayBuffer(file);
+  } else if (ext === 'numbers') {
+    showImportPreview([], '⚠ Numbers dosyaları için önce Excel veya CSV olarak kaydedin.');
+  } else {
+    showImportPreview([], '⚠ Desteklenmeyen dosya türü. CSV veya Excel kullanın.');
+  }
+}
+
+function parseImportCSV(text) {
+  const lines = text.split('\n').filter(l => l.trim());
+  if (!lines.length) return;
+  const delim = lines[0].includes(';') ? ';' : ',';
+  const headers = lines[0].split(delim).map(h => h.trim().toLowerCase().replace(/['"]/g,''));
+  
+  const fieldMap = {
+    name: headers.findIndex(h => h.includes('isim')||h.includes('adı')||h.includes('ad')||h.includes('name')||h.includes('müşteri')),
+    phone: headers.findIndex(h => h.includes('telefon')||h.includes('tel')||h.includes('phone')||h.includes('gsm')||h.includes('cep')),
+    note: headers.findIndex(h => h.includes('not')||h.includes('note')||h.includes('açıklama')),
+    status: headers.findIndex(h => h.includes('durum')||h.includes('status')||h.includes('aşama')),
+    project: headers.findIndex(h => h.includes('proje')||h.includes('form')||h.includes('project')),
+  };
+
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(delim).map(c => c.trim().replace(/^["']|["']$/g,''));
+    const name = fieldMap.name >= 0 ? cols[fieldMap.name] : cols[0];
+    if (!name || name.length < 2) continue;
+    let phone = fieldMap.phone >= 0 ? cols[fieldMap.phone] : (cols[1]||'');
+    // Normalize phone
+    phone = phone.replace(/[^0-9+]/g,'');
+    if (phone.startsWith('90') && phone.length === 12) phone = '0' + phone.slice(2);
+    rows.push({
+      name: name.trim(),
+      phone: phone || '',
+      notes: fieldMap.note >= 0 ? (cols[fieldMap.note]||'') : '',
+      project_hint: fieldMap.project >= 0 ? (cols[fieldMap.project]||'') : '',
+    });
+  }
+  showImportPreview(rows, null);
+}
+
+function parseImportExcel(buffer) {
+  // Use SheetJS if available, otherwise show error
+  try {
+    if (typeof XLSX === 'undefined') {
+      showImportPreview([], '⚠ Excel desteği için SheetJS yükleniyor...');
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+      s.onload = () => {
+        const wb = XLSX.read(buffer, {type:'arraybuffer'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_csv(ws);
+        parseImportCSV(data);
+      };
+      document.head.appendChild(s);
+    } else {
+      const wb = XLSX.read(buffer, {type:'arraybuffer'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_csv(ws);
+      parseImportCSV(data);
+    }
+  } catch(e) {
+    showImportPreview([], '⚠ Excel dosyası okunamadı: ' + e.message);
+  }
+}
+
+function showImportPreview(rows, errMsg) {
+  importData = rows;
+  const prev = ge('imp-preview');
+  if (!prev) return;
+  
+  if (errMsg) {
+    prev.innerHTML = `<div style="color:var(--red);padding:8px;font-size:13px">${errMsg}</div>`;
+    ge('imp-actions').style.display = 'none';
+    ge('imp-proj-row').style.display = 'none';
+    return;
+  }
+  
+  if (!rows.length) {
+    prev.innerHTML = '<div style="color:var(--red);padding:8px;font-size:13px">⚠ Kayıt bulunamadı.</div>';
+    ge('imp-actions').style.display = 'none';
+    return;
+  }
+  
+  // Check for duplicate phones
+  const existingPhones = new Set(CUSTOMERS.map(c => c.phone).filter(Boolean));
+  const dups = rows.filter(r => r.phone && existingPhones.has(r.phone));
+  
+  prev.innerHTML = `
+    <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px">${rows.length} kayıt bulundu${dups.length ? ` · <span style="color:var(--red)">${dups.length} tekrar telefon (eklenM)</span>` : ''}</div>
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;max-height:180px;overflow-y:auto;padding:8px">
+      ${rows.slice(0,10).map(r => `<div style="padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;display:flex;gap:10px">
+        <span style="font-weight:600;flex:1">${r.name}</span>
+        <span style="color:var(--muted)">${r.phone||'—'}</span>
+        ${existingPhones.has(r.phone) ? '<span style="color:var(--red);font-size:10px">✕ tekrar</span>' : ''}
+      </div>`).join('')}
+      ${rows.length > 10 ? `<div style="padding:4px 0;font-size:11px;color:var(--muted)">+ ${rows.length-10} kayıt daha...</div>` : ''}
+    </div>`;
+  
+  ge('imp-proj-row').style.display = 'block';
+  ge('imp-actions').style.display = 'flex';
+}
+
+function importReset() {
+  importData = [];
+  const prev = ge('imp-preview'); if(prev) prev.innerHTML = '';
+  const pr = ge('imp-proj-row'); if(pr) pr.style.display = 'none';
+  const pa = ge('imp-actions'); if(pa) pa.style.display = 'none';
+  const pf = ge('imp-file'); if(pf) pf.value = '';
+  const ps = ge('imp-proj-srch'); if(ps) ps.value = '';
+  const pv = ge('imp-proj-id'); if(pv) pv.value = '';
+}
+
+async function importLeads() {
+  if (!importData.length) return;
+  
+  const projId = ge('imp-proj-id')?.value || null;
+  const existingPhones = new Set(CUSTOMERS.map(c => c.phone).filter(Boolean));
+  
+  // Filter out duplicates
+  const newLeads = importData.filter(r => !r.phone || !existingPhones.has(r.phone));
+  const skipped = importData.length - newLeads.length;
+  
+  if (!newLeads.length) {
+    flash('Tüm kayıtlar zaten mevcut — ekleme yapılmadı.', true);
+    return;
+  }
+  
+  // Map project hint to project_id
+  const rows = newLeads.map((r, idx) => {
+    let pid = projId;
+    if (!pid && r.project_hint) {
+      const ph = r.project_hint.toLowerCase();
+      const foundProj = PROJECTS.find(p => p.name.toLowerCase().includes(ph) || ph.includes(p.name.toLowerCase()));
+      if (foundProj) pid = foundProj.id;
+    }
+    const BATCH = 5;
+    const batchIdx = Math.floor((CUSTOMERS.length + idx) / BATCH);
+    return {
+      name: r.name, phone: r.phone || '',
+      project_id: pid || null, notes: r.notes || '',
+      status: 'bekleyen', created_by: CUR.id,
+      batch_group: batchIdx,
+      batch_consultant: getGroupConsultant(batchIdx),
+    };
+  });
+  
+  // Insert in batches of 50
+  let added = 0;
+  const CHUNK = 50;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK);
+    const { data, error } = await db.from('customers').insert(chunk).select();
+    if (error) { flash('Hata: ' + error.message, true); break; }
+    CUSTOMERS.push(...(data||[]));
+    added += (data||[]).length;
+  }
+  
+  closeMo('mo-import'); importReset();
+  flash(`${added} müşteri eklendi${skipped ? `, ${skipped} tekrar atlandı` : ''}`);
+  renderAll();
+}
+
+
+// ═══ PORTFOLIO OPTIONS ══════════════════════════════════
+let pendingPortOpts = {prices:[], floors: []};
+
+function addPortOpt(type) {
+  const inp = type === 'price' ? ge('nport-price-new') : ge('nport-floor-new');
+  const listEl = type === 'price' ? ge('port-prices-list') : ge('port-floors-list');
+  if (!inp || !inp.value.trim()) return;
+  const val = inp.value.trim();
+  if (type === 'price') pendingPortOpts.prices.push(val);
+  else pendingPortOpts.floors.push(val);
+  renderPortOptList(type);
+  inp.value = '';
+}
+function removePortOpt(type, idx) {
+  if (type === 'price') pendingPortOpts.prices.splice(idx, 1);
+  else pendingPortOpts.floors.splice(idx, 1);
+  renderPortOptList(type);
+}
+function renderPortOptList(type) {
+  const arr = type === 'price' ? pendingPortOpts.prices : pendingPortOpts.floors;
+  const listEl = type === 'price' ? ge('port-prices-list') : ge('port-floors-list');
+  if (!listEl) return;
+  listEl.innerHTML = arr.map((v,i) => `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--border);font-size:12px">
+    <span style="flex:1">${v}</span>
+    <button onclick="removePortOpt('${type}',${i})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:13px">✕</button>
+  </div>`).join('');
+}
+function resetPortOpts() {
+  pendingPortOpts = {prices:[], floors:[]};
+  const pl = ge('port-prices-list'); if(pl) pl.innerHTML = '';
+  const fl = ge('port-floors-list'); if(fl) fl.innerHTML = '';
+  const pn = ge('nport-price-new'); if(pn) pn.value = '';
+  const fn = ge('nport-floor-new'); if(fn) fn.value = '';
+}
+
+
+function openPdfModal() {
+  const sel = ge('pdf-consultant-filter');
+  if (sel) {
+    sel.innerHTML = '<option value="">Tümü</option>' +
+      PROFILES.filter(p=>p.role==='danisan').map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  }
+  openMo('mo-pdf');
+}
+
 // ═══ PAGE SWITCH ═══════════════════════════════════════════
 function switchPage(page, tab) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
@@ -1571,15 +2084,46 @@ function flash(msg, isErr) {
   setTimeout(() => f.style.display = 'none', 2500);
 }
 
-['mo-cust','mo-proj','mo-port','mo-xml','mo-pdf','mo-del','mo-proj-detail'].forEach(id => {
+['mo-cust','mo-proj','mo-port','mo-xml','mo-pdf','mo-del','mo-proj-detail','mo-import'].forEach(id => {
   const el = ge(id);
   if (el) el.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('open'); });
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') ['mo-cust','mo-proj','mo-port','mo-xml','mo-pdf','mo-del','mo-proj-detail'].forEach(id => { const el=ge(id); if(el) el.classList.remove('open'); });
+  if (e.key === 'Escape') ['mo-cust','mo-proj','mo-port','mo-xml','mo-pdf','mo-del','mo-proj-detail','mo-import'].forEach(id => { const el=ge(id); if(el) el.classList.remove('open'); });
 });
 
 </script>
+
+
+<!-- FILE IMPORT MODAL -->
+<div class="mo" id="mo-import">
+  <div class="mbox md">
+    <div class="mtitle">⬆ Dosyadan Müşteri Ekle</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px">CSV, Excel veya Numbers dosyası yükleyin. İsim, telefon, proje, not alanları otomatik algılanır.</p>
+    <div id="imp-drop" style="border:2px dashed var(--border);border-radius:10px;padding:2rem;text-align:center;cursor:pointer;color:var(--muted);font-size:13px;transition:all .15s"
+      onclick="ge('imp-file').click()"
+      ondragover="event.preventDefault();this.style.borderColor='var(--navy)';this.style.background='#f0f5fb'"
+      ondragleave="this.style.borderColor='';this.style.background=''"
+      ondrop="event.preventDefault();this.style.borderColor='';this.style.background='';importFileSelect(event.dataTransfer.files[0])">
+      📂 CSV, Excel veya Numbers dosyasını sürükleyin veya tıklayın
+    </div>
+    <input type="file" id="imp-file" accept=".csv,.xlsx,.xls,.numbers" style="display:none" onchange="importFileSelect(this.files[0])">
+    <div id="imp-preview" style="margin-top:10px"></div>
+    <div id="imp-proj-row" style="display:none;margin-top:10px">
+      <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:4px">Varsayılan Proje (opsiyonel)</label>
+      <div class="ss-wrap">
+        <input class="ss-inp" id="imp-proj-srch" type="text" placeholder="Proje seç..." autocomplete="off"
+          oninput="buildProjSS('imp-proj-dd','imp-proj-id',this.value)" onfocus="buildProjSS('imp-proj-dd','imp-proj-id',this.value)" onblur="setTimeout(()=>closeSS('imp-proj-dd'),150)">
+        <input type="hidden" id="imp-proj-id">
+        <div class="ss-dd" id="imp-proj-dd"></div>
+      </div>
+    </div>
+    <div id="imp-actions" style="display:none" class="mact">
+      <button class="mcancel" onclick="closeMo('mo-import');importReset()">İptal</button>
+      <button class="msubmit-g" onclick="importLeads()">✓ Müşterileri Ekle</button>
+    </div>
+  </div>
+</div>
 
 <!-- PROJECT DETAIL MODAL -->
 <div class="mo" id="mo-proj-detail">
